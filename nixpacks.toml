@@ -1,14 +1,16 @@
 # Nixpacks configuration for Railway
-# DO NOT USE THIS - Railway should use backend/nixpacks.toml instead
-# Set Root Directory to "backend" in Railway dashboard!
+# This works even if Root Directory isn't set - it runs from root and goes to backend
 
 [phases.setup]
 nixPkgs = ["nodejs_18", "npm-9_x"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm install", "cd backend && npm ci"]
 
-# Empty build - Railway should NOT build from root
+# No build needed
 [phases.build]
 cmds = []
+
+[start]
+cmd = "cd backend && npm start"
 
