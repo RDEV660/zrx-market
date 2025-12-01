@@ -5,10 +5,22 @@ const sqlite3 = require('sqlite3').verbose();
 const EventEmitter = require('events');
 
 // Database connection for bot
-const DB_PATH = path.join(__dirname, '../data/zrx-market.db');
+// Ensure data directory exists
+const fs = require('fs');
+const DATA_DIR = path.join(__dirname, '../data');
+if (!fs.existsSync(DATA_DIR)) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (mkdirErr) {
+    console.warn('Could not create data directory:', mkdirErr.message);
+  }
+}
+
+const DB_PATH = path.join(DATA_DIR, 'zrx-market.db');
 const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
     console.error('Bot: Error opening database:', err.message);
+    console.error('Database path:', DB_PATH);
   }
 });
 

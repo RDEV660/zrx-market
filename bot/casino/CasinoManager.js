@@ -11,6 +11,11 @@ class CasinoManager {
 
   async initializeDatabase() {
     return new Promise((resolve, reject) => {
+      // Use a timeout to prevent hanging if database is locked
+      const timeout = setTimeout(() => {
+        reject(new Error('Database initialization timeout'));
+      }, 5000);
+
       this.db.run(`
         CREATE TABLE IF NOT EXISTS casino_balances (
           discordId TEXT PRIMARY KEY,
@@ -23,9 +28,12 @@ class CasinoManager {
           updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `, (err) => {
+        clearTimeout(timeout);
         if (err) {
           console.error('Error creating casino_balances table:', err);
-          reject(err);
+          // Don't reject - allow bot to continue without casino features
+          console.warn('⚠️  Casino features will be disabled due to database error');
+          resolve(); // Resolve instead of reject to prevent bot crash
         } else {
           console.log('✅ Casino database initialized');
           resolve();
