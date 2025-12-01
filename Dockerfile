@@ -2,13 +2,17 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy backend package files
+# Build frontend first
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
+# Setup backend
+WORKDIR /app
 COPY backend/package.json ./
-
-# Install backend dependencies (use npm install, not npm ci)
 RUN npm install --omit=dev
-
-# Copy backend files
 COPY backend/ ./
 
 # Copy bot directory to /bot (absolute path to ensure it's always available)
@@ -20,6 +24,9 @@ RUN npm install --omit=dev
 
 # Return to app directory
 WORKDIR /app
+
+# Copy built frontend to backend public directory
+RUN mkdir -p public && cp -r /frontend/dist/* public/
 
 # Expose port
 EXPOSE 8080

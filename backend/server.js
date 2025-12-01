@@ -47,6 +47,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Serve frontend static files
+const frontendPath = path.join(__dirname, 'public');
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath));
+  
+  // Serve index.html for all non-API routes (SPA routing)
+  app.get('*', (req, res, next) => {
+    // Skip API routes and auth routes
+    if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path === '/health') {
+      return next();
+    }
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
+
 // Session configuration
 const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-min-32-chars-please',
@@ -91,24 +106,36 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/users', userRoutes);
 
-// Root route
-app.get('/', (req, res) => {
-  res.json({
-    message: 'ZRX Market API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      auth: '/auth',
-      api: '/api'
-    },
-    frontend: process.env.FRONTEND_URL || process.env.BASE_URL || 'http://localhost:5173'
-  });
-});
-
-// Health check
+// Health check (before static files)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Serve frontend static files (after API routes)
+const frontendPath = path.join(__dirname, 'public');
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath));
+  
+  // Serve index.html for all non-API routes (SPA routing)
+  // This must be last to catch all routes not handled above
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+} else {
+  // If frontend not built, show API info at root
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'ZRX Market API',
+      version: '1.0.0',
+      endpoints: {
+        health: '/health',
+        auth: '/auth',
+        api: '/api'
+      },
+      frontend: process.env.FRONTEND_URL || process.env.BASE_URL || 'http://localhost:5173'
+    });
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
