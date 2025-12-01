@@ -522,7 +522,7 @@ class MiddlemanBot extends EventEmitter {
     const isEphemeral = ephemeralCommands.includes(command);
     
     if (needsDefer) {
-      await interaction.deferReply({ ephemeral: isEphemeral });
+      await interaction.deferReply({ flags: isEphemeral ? 64 : undefined }); // 64 = EPHEMERAL flag
     }
 
     // Casino commands channel check (after defer to prevent timeout)
@@ -554,7 +554,7 @@ class MiddlemanBot extends EventEmitter {
           await this.handleSlashHelp(interaction);
           break;
         case 'ping':
-          await interaction.reply({ content: `🏓 Pong! Fuck you, I'm alive. Latency: ${this.client.ws.ping}ms`, ephemeral: true });
+          await interaction.reply({ content: `🏓 Pong! Fuck you, I'm alive. Latency: ${this.client.ws.ping}ms`, flags: 64 }); // 64 = EPHEMERAL flag
           break;
         case 'stats':
           await this.handleSlashStats(interaction);
