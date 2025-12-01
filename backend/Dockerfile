@@ -1,24 +1,19 @@
-# Dockerfile for Railway - Backend Service
-# NOTE: This Dockerfile can't build frontend because it can't access ../frontend/
-# Railway should use the ROOT Dockerfile instead (which can access frontend/)
-# If Railway Root Directory is set to "backend", change it to empty/root
+FROM node:18-alpine
 
-FROM node:18
-
-# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (use npm install instead of npm ci since we don't have lock file)
+RUN npm install --omit=dev
 
-# Copy all backend files
+# Copy backend files
 COPY . .
 
-# Expose port (Railway will set PORT automatically)
-EXPOSE 3000
+# Expose port
+EXPOSE 8080
 
-# Start the server
-CMD ["node", "server.js"]
+# Start server
+CMD ["npm", "start"]
+
