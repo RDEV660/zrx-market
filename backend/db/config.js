@@ -104,78 +104,114 @@ function initDatabase() {
           }
         });
 
-      // Trades table
-      db.run(`CREATE TABLE IF NOT EXISTS trades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        creatorId TEXT NOT NULL,
-        offered TEXT NOT NULL,
-        wanted TEXT NOT NULL,
-        value TEXT,
-        notes TEXT,
-        robloxUsername TEXT,
-        status TEXT DEFAULT 'active',
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (creatorId) REFERENCES users(discordId)
-      )`);
+        // Trades table
+        db.run(`CREATE TABLE IF NOT EXISTS trades (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          creatorId TEXT NOT NULL,
+          offered TEXT NOT NULL,
+          wanted TEXT NOT NULL,
+          value TEXT,
+          notes TEXT,
+          robloxUsername TEXT,
+          status TEXT DEFAULT 'active',
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (creatorId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating trades table:', err.message);
+            hasError = true;
+            errors.push({ table: 'trades', error: err });
+          }
+        });
 
-      // Middleman requests table
-      db.run(`CREATE TABLE IF NOT EXISTS middleman (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        requesterId TEXT NOT NULL,
-        user1 TEXT NOT NULL,
-        user2 TEXT NOT NULL,
-        item TEXT NOT NULL,
-        value TEXT,
-        proofLinks TEXT,
-        robloxUsername TEXT,
-        status TEXT DEFAULT 'pending',
-        middlemanId TEXT,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (requesterId) REFERENCES users(discordId)
-      )`);
+        // Middleman requests table
+        db.run(`CREATE TABLE IF NOT EXISTS middleman (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          requesterId TEXT NOT NULL,
+          user1 TEXT NOT NULL,
+          user2 TEXT NOT NULL,
+          item TEXT NOT NULL,
+          value TEXT,
+          proofLinks TEXT,
+          robloxUsername TEXT,
+          status TEXT DEFAULT 'pending',
+          middlemanId TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (requesterId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating middleman table:', err.message);
+            hasError = true;
+            errors.push({ table: 'middleman', error: err });
+          }
+        });
 
-      // Reports table
-      db.run(`CREATE TABLE IF NOT EXISTS reports (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        reporterId TEXT NOT NULL,
-        accusedDiscordId TEXT NOT NULL,
-        details TEXT NOT NULL,
-        evidenceLinks TEXT,
-        status TEXT DEFAULT 'pending',
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (reporterId) REFERENCES users(discordId)
-      )`);
+        // Reports table
+        db.run(`CREATE TABLE IF NOT EXISTS reports (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          reporterId TEXT NOT NULL,
+          accusedDiscordId TEXT NOT NULL,
+          details TEXT NOT NULL,
+          evidenceLinks TEXT,
+          status TEXT DEFAULT 'pending',
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (reporterId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating reports table:', err.message);
+            hasError = true;
+            errors.push({ table: 'reports', error: err });
+          }
+        });
 
-      // Blacklist table
-      db.run(`CREATE TABLE IF NOT EXISTS blacklist (
-        discordId TEXT PRIMARY KEY,
-        reason TEXT NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`);
+        // Blacklist table
+        db.run(`CREATE TABLE IF NOT EXISTS blacklist (
+          discordId TEXT PRIMARY KEY,
+          reason TEXT NOT NULL,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating blacklist table:', err.message);
+            hasError = true;
+            errors.push({ table: 'blacklist', error: err });
+          }
+        });
 
-      // Messages table
-      db.run(`CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tradeId INTEGER,
-        senderId TEXT NOT NULL,
-        recipientId TEXT NOT NULL,
-        content TEXT NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (tradeId) REFERENCES trades(id),
-        FOREIGN KEY (senderId) REFERENCES users(discordId),
-        FOREIGN KEY (recipientId) REFERENCES users(discordId)
-      )`);
+        // Messages table
+        db.run(`CREATE TABLE IF NOT EXISTS messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tradeId INTEGER,
+          senderId TEXT NOT NULL,
+          recipientId TEXT NOT NULL,
+          content TEXT NOT NULL,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (tradeId) REFERENCES trades(id),
+          FOREIGN KEY (senderId) REFERENCES users(discordId),
+          FOREIGN KEY (recipientId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating messages table:', err.message);
+            hasError = true;
+            errors.push({ table: 'messages', error: err });
+          }
+        });
 
-      // Admin logs table
-      db.run(`CREATE TABLE IF NOT EXISTS admin_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        actorId TEXT NOT NULL,
-        action TEXT NOT NULL,
-        targetId TEXT,
-        details TEXT,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (actorId) REFERENCES users(discordId)
-      )`);
+        // Admin logs table
+        db.run(`CREATE TABLE IF NOT EXISTS admin_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          actorId TEXT NOT NULL,
+          action TEXT NOT NULL,
+          targetId TEXT,
+          details TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (actorId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating admin_logs table:', err.message);
+            hasError = true;
+            errors.push({ table: 'admin_logs', error: err });
+          }
+        });
 
         db.run('CREATE INDEX IF NOT EXISTS idx_trades_creator ON trades(creatorId)', (err) => {
           if (err) {
