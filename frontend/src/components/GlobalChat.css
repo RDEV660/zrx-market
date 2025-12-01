@@ -269,14 +269,15 @@
 
 @media (max-width: 768px) {
   .global-chat {
-    width: 300px;
-    max-width: calc(100vw - 40px);
-    position: fixed;
-    top: auto;
-    bottom: 20px;
-    left: 20px;
-    height: 400px;
-    max-height: calc(100vh - 100px);
+    width: 300px !important;
+    max-width: calc(100vw - 40px) !important;
+    position: fixed !important;
+    top: auto !important;
+    bottom: 20px !important;
+    left: 20px !important;
+    right: auto !important;
+    height: 400px !important;
+    max-height: calc(100vh - 100px) !important;
     border-right: 2px solid rgba(139, 92, 246, 0.3);
     border-top: 2px solid rgba(139, 92, 246, 0.3);
     border-radius: 12px 12px 0 12px;
@@ -285,9 +286,10 @@
   }
   
   .global-chat-toggle.collapsed {
-    bottom: 20px;
-    left: 20px;
-    top: auto;
+    bottom: 20px !important;
+    left: 20px !important;
+    top: auto !important;
+    right: auto !important;
     transform: none;
     border-radius: 12px;
     width: 50px;
@@ -302,17 +304,21 @@
 
 @media (max-width: 480px) {
   .global-chat {
-    width: calc(100vw - 20px);
-    max-width: 320px;
-    bottom: 15px;
-    left: 10px;
-    height: 350px;
-    max-height: calc(100vh - 80px);
+    width: calc(100vw - 20px) !important;
+    max-width: 320px !important;
+    bottom: 15px !important;
+    left: 10px !important;
+    top: auto !important;
+    right: auto !important;
+    height: 350px !important;
+    max-height: calc(100vh - 80px) !important;
   }
   
   .global-chat-toggle.collapsed {
-    bottom: 15px;
-    left: 10px;
+    bottom: 15px !important;
+    left: 10px !important;
+    top: auto !important;
+    right: auto !important;
     width: 45px;
     height: 45px;
     font-size: 1.3rem;

@@ -18,13 +18,24 @@ const GlobalChat = () => {
   const messageListRef = useRef(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [navbarHeight, setNavbarHeight] = useState(80);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   useEffect(() => {
-    // Calculate navbar height after DOM loads
+    // Check if mobile
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    // Calculate navbar height after DOM loads (only for desktop)
     const updateNavbarHeight = () => {
-      const height = getNavbarHeight();
-      if (height > 0) {
-        setNavbarHeight(height);
+      if (window.innerWidth > 768) {
+        const height = getNavbarHeight();
+        if (height > 0) {
+          setNavbarHeight(height);
+        }
       }
     };
     
@@ -46,6 +57,7 @@ const GlobalChat = () => {
     }
     
     return () => {
+      window.removeEventListener('resize', checkMobile);
       window.removeEventListener('resize', updateNavbarHeight);
       window.removeEventListener('load', updateNavbarHeight);
       observer.disconnect();
@@ -127,7 +139,7 @@ const GlobalChat = () => {
         className="global-chat-toggle collapsed"
         onClick={() => setIsCollapsed(false)}
         title="Open Global Chat"
-        style={{ top: `${navbarHeight + 10}px` }}
+        style={!isMobile ? { top: `${navbarHeight + 10}px` } : {}}
       >
         💬
       </button>
@@ -135,7 +147,7 @@ const GlobalChat = () => {
   }
 
   return (
-    <div className="global-chat" style={{ top: `${navbarHeight}px` }}>
+    <div className="global-chat" style={!isMobile ? { top: `${navbarHeight}px` } : {}}>
       <div className="global-chat-header">
         <h3>💬 Global Chat</h3>
         <button 
