@@ -1,11 +1,8 @@
-[phases.setup]
-nixPkgs = ["nodejs-18_x"]
+[providers]
+node = "18"
 
 [phases.install]
-cmds = ["npm install --production"]
-
-[phases.build]
-cmds = []
+cmds = ["npm install --omit=dev"]
 
 [start]
 cmd = "npm start"
