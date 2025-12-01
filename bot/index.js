@@ -472,7 +472,22 @@ class MiddlemanBot extends EventEmitter {
     const command = interaction.commandName;
     const CASINO_CHANNEL_ID = '1406780875911336007';
 
-    // Casino commands channel check
+    // Commands that need async work - defer immediately to prevent timeout
+    const asyncCommands = ['balance', 'daily', 'casinostats', 'coinflip', 'dice', 'double', 'roulette', 'blackjack', 'hit', 'stand', 
+                           'stats', 'user', 'trade', 'mm', 'blacklist', 'report', 'verify', 'unverify', 'serverstats', 'cleanup', 
+                           'casinoadd', 'casinoremove', 'casinoreset'];
+    const needsDefer = asyncCommands.includes(command);
+    
+    // Commands that should be ephemeral (only visible to user)
+    const ephemeralCommands = ['stats', 'user', 'trade', 'mm', 'blacklist', 'report', 'verify', 'unverify', 'serverstats', 'cleanup', 
+                                'casinoadd', 'casinoremove', 'casinoreset'];
+    const isEphemeral = ephemeralCommands.includes(command);
+    
+    if (needsDefer) {
+      await interaction.deferReply({ ephemeral: isEphemeral });
+    }
+
+    // Casino commands channel check (after defer to prevent timeout)
     const casinoCommands = ['balance', 'daily', 'casinostats', 'coinflip', 'dice', 'double', 'roulette', 'blackjack', 'hit', 'stand'];
     if (casinoCommands.includes(command)) {
       if (interaction.channel.id !== CASINO_CHANNEL_ID) {
@@ -487,7 +502,11 @@ class MiddlemanBot extends EventEmitter {
           `Can you read? Casino commands go in <#${CASINO_CHANNEL_ID}>, not here, you fucking idiot.`
         ];
         const snarky = snarkyResponses[Math.floor(Math.random() * snarkyResponses.length)];
-        return await interaction.reply({ content: `❌ ${snarky}`, ephemeral: true });
+        if (needsDefer) {
+          return await interaction.editReply({ content: `❌ ${snarky}` });
+        } else {
+          return await interaction.reply({ content: `❌ ${snarky}`, ephemeral: true });
+        }
       }
     }
 
@@ -2808,7 +2827,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashStats(interaction) {
-    await interaction.deferReply({ ephemeral: true });
     try {
       const totalTrades = await dbHelpers.get('SELECT COUNT(*) as count FROM trades WHERE status = ?', ['active']);
       const totalUsers = await dbHelpers.get('SELECT COUNT(*) as count FROM users');
@@ -2838,7 +2856,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashUserLookup(interaction) {
-    await interaction.deferReply({ ephemeral: true });
     const userId = interaction.options.getString('discordid').replace(/[<@!>]/g, '');
     
     try {
@@ -2876,7 +2893,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashTradeLookup(interaction) {
-    await interaction.deferReply({ ephemeral: true });
     const tradeId = interaction.options.getInteger('id');
 
     try {
@@ -2928,7 +2944,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashBalance(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const balance = await this.casino.getBalance(interaction.user.id);
       const embed = new EmbedBuilder()
@@ -2945,7 +2960,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashDaily(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const result = await this.casino.dailyReward(interaction.user.id);
       
@@ -2972,7 +2986,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashCasinoStats(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const targetUser = interaction.options.getUser('user');
       const userId = targetUser ? targetUser.id : interaction.user.id;
@@ -3003,7 +3016,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashCoinflip(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const bet = interaction.options.getInteger('bet');
       const choice = interaction.options.getString('choice').toLowerCase();
@@ -3032,7 +3044,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashDice(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const bet = interaction.options.getInteger('bet');
       const guess = interaction.options.getInteger('guess');
@@ -3061,7 +3072,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashDouble(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const bet = interaction.options.getInteger('bet');
 
@@ -3089,7 +3099,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashRoulette(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const bet = interaction.options.getInteger('bet');
       const choice = interaction.options.getString('choice');
@@ -3118,7 +3127,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashBlackjack(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const bet = interaction.options.getInteger('bet');
 
@@ -3147,7 +3155,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashBlackjackHit(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const result = await this.casino.blackjackHit(interaction.user.id);
 
@@ -3189,7 +3196,6 @@ class MiddlemanBot extends EventEmitter {
   }
 
   async handleSlashBlackjackStand(interaction) {
-    await interaction.deferReply({ ephemeral: false });
     try {
       const result = await this.casino.blackjackStand(interaction.user.id);
 
@@ -3240,10 +3246,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashMM(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     const subcommand = interaction.options.getSubcommand();
 
     try {
@@ -3284,10 +3290,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashBlacklist(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     const subcommand = interaction.options.getSubcommand();
 
     try {
@@ -3327,10 +3333,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashReport(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     const subcommand = interaction.options.getSubcommand();
 
     try {
@@ -3366,10 +3372,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashVerify(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     const user = interaction.options.getUser('user');
     const message = { author: { id: interaction.user.id }, reply: (content) => interaction.editReply({ content }) };
     await this.handleVerify(message, [user.id]);
@@ -3378,10 +3384,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashUnverify(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     const user = interaction.options.getUser('user');
     const message = { author: { id: interaction.user.id }, reply: (content) => interaction.editReply({ content }) };
     await this.handleUnverify(message, [user.id]);
@@ -3390,10 +3396,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashServerStats(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     try {
       const guild = interaction.guild;
       if (!guild) {
@@ -3429,10 +3435,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashCleanup(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     try {
       const result = await dbHelpers.run(
         `UPDATE trades SET status = 'expired' 
@@ -3449,10 +3455,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashCasinoAdd(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     const user = interaction.options.getUser('user');
     const amount = interaction.options.getInteger('amount');
 
@@ -3479,10 +3485,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashCasinoRemove(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     const user = interaction.options.getUser('user');
     const amount = interaction.options.getInteger('amount');
 
@@ -3514,10 +3520,10 @@ class MiddlemanBot extends EventEmitter {
   async handleSlashCasinoReset(interaction) {
     const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
     if (!hasModeratorRole) {
-      return interaction.reply({ content: `❌ ${getSnarkyResponse('noPermission')}`, ephemeral: true });
+      // Already deferred at top level, use editReply
+      return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
     }
 
-    await interaction.deferReply({ ephemeral: true });
     const user = interaction.options.getUser('user');
 
     try {
