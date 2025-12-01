@@ -97,6 +97,7 @@ app.get('/health', (req, res) => {
 });
 
 // Serve frontend static files (after API routes)
+// Frontend is built and copied to public/ directory during Docker build
 const frontendPath = path.join(__dirname, 'public');
 if (fs.existsSync(frontendPath)) {
   app.use(express.static(frontendPath));
