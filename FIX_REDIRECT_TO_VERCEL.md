@@ -4,7 +4,8 @@
 
 After Discord authentication, it redirects you to `localhost` instead of your Vercel website.
 
-Your Vercel domain: `https://zrx-market-git-main-zrxmarkets-projects.vercel.app`
+Your Railway URL: `https://zrx-market-copy-production.up.railway.app/`
+Your Vercel domain: `https://zrx-market-git-main-zrxmarkets-projects.vercel.app` (if using separately)
 
 ---
 
@@ -16,7 +17,8 @@ Your Vercel domain: `https://zrx-market-git-main-zrxmarkets-projects.vercel.app`
 2. Click **"+ New Variable"**
 3. Add:
    - **Variable Name**: `FRONTEND_URL`
-   - **Value**: `https://zrx-market-git-main-zrxmarkets-projects.vercel.app`
+   - **Value**: `https://zrx-market-copy-production.up.railway.app`
+   - (If using Vercel separately, use Vercel URL instead)
 4. Click **"Add"**
 
 This tells Railway where to redirect after Discord login!
