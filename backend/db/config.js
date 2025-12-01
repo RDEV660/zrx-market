@@ -378,6 +378,49 @@ function initDatabase() {
           }
         });
 
+        // Global chat messages table
+        db.run(`CREATE TABLE IF NOT EXISTS global_chat_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId TEXT NOT NULL,
+          username TEXT NOT NULL,
+          avatar TEXT,
+          content TEXT NOT NULL,
+          isFiltered INTEGER DEFAULT 0,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (userId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating global_chat_messages table:', err.message);
+            hasError = true;
+            errors.push({ table: 'global_chat_messages', error: err });
+          }
+        });
+
+        // Bridge sessions table (for Discord bridge threads)
+        db.run(`CREATE TABLE IF NOT EXISTS bridge_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          reportId INTEGER NOT NULL,
+          threadId TEXT,
+          accusedDiscordId TEXT,
+          moderatorDiscordId TEXT,
+          webhookUrl TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (reportId) REFERENCES reports(id)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating bridge_sessions table:', err.message);
+            hasError = true;
+            errors.push({ table: 'bridge_sessions', error: err });
+          } else {
+            // Ensure webhookUrl column exists (for older deployments)
+            db.run(`ALTER TABLE bridge_sessions ADD COLUMN webhookUrl TEXT`, (alterErr) => {
+              if (alterErr && !alterErr.message.includes('duplicate column')) {
+                console.warn('⚠️  Could not add webhookUrl column to bridge_sessions (may already exist):', alterErr.message);
+              }
+            });
+          }
+        });
+
         db.run('CREATE INDEX IF NOT EXISTS idx_trades_creator ON trades(creatorId)', (err) => {
           if (err) {
             console.error('Error creating index idx_trades_creator:', err.message);
