@@ -278,9 +278,9 @@ const Templates = () => {
                 <div className="template-section">
                   <strong>Offered:</strong>
                   <div className="items-list">
-                    {template.offered?.map((item, i) => (
+                    {Array.isArray(template.offered) && template.offered.map((item, i) => (
                       <span key={i} className="item-tag">
-                        {item.name} {item.value && `(${item.value} ${item.valueUnit || ''})`}
+                        {item?.name || item} {item?.value && `(${item.value} ${item.valueUnit || ''})`}
                       </span>
                     ))}
                   </div>
@@ -288,9 +288,9 @@ const Templates = () => {
                 <div className="template-section">
                   <strong>Wanted:</strong>
                   <div className="items-list">
-                    {template.wanted?.map((item, i) => (
+                    {Array.isArray(template.wanted) && template.wanted.map((item, i) => (
                       <span key={i} className="item-tag">
-                        {item.name} {item.value && `(${item.value} ${item.valueUnit || ''})`}
+                        {item?.name || item} {item?.value && `(${item.value} ${item.valueUnit || ''})`}
                       </span>
                     ))}
                   </div>

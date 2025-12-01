@@ -144,8 +144,8 @@ const Profile = () => {
                         </div>
                         <div className="trade-card-items">
                           <div className="trade-items">
-                            <strong>Offered:</strong> {trade.offered?.slice(0, 2).map(i => i.name).join(', ')}
-                            {trade.offered?.length > 2 && ` +${trade.offered.length - 2}`}
+                            <strong>Offered:</strong> {Array.isArray(trade.offered) ? trade.offered.slice(0, 2).map(i => i?.name || i).join(', ') : (trade.offered || 'N/A')}
+                            {Array.isArray(trade.offered) && trade.offered.length > 2 && ` +${trade.offered.length - 2}`}
                           </div>
                         </div>
                       </div>
@@ -293,8 +293,8 @@ const TradesList = ({ userId }) => {
               </div>
               <div className="trade-card-items">
                 <div className="trade-items">
-                  <strong>Offered:</strong> {trade.offered?.slice(0, 2).map(i => i.name).join(', ')}
-                  {trade.offered?.length > 2 && ` +${trade.offered.length - 2}`}
+                  <strong>Offered:</strong> {Array.isArray(trade.offered) ? trade.offered.slice(0, 2).map(i => i?.name || i).join(', ') : (trade.offered || 'N/A')}
+                  {Array.isArray(trade.offered) && trade.offered.length > 2 && ` +${trade.offered.length - 2}`}
                 </div>
               </div>
             </div>

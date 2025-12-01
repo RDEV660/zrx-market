@@ -23,8 +23,9 @@ const Notifications = ({ isOpen, onClose }) => {
   const fetchNotifications = async () => {
     try {
       const response = await axios.get('/api/notifications');
-      setNotifications(response.data);
-      setUnreadCount(response.data.filter(n => !n.isRead).length);
+      const notifications = Array.isArray(response.data) ? response.data : [];
+      setNotifications(notifications);
+      setUnreadCount(notifications.filter(n => !n.isRead).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
@@ -44,7 +45,7 @@ const Notifications = ({ isOpen, onClose }) => {
   const markAsRead = async (id) => {
     try {
       await axios.patch(`/api/notifications/${id}/read`);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: 1 } : n));
+      setNotifications(prev => Array.isArray(prev) ? prev.map(n => n.id === id ? { ...n, isRead: 1 } : n) : []);
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -54,7 +55,7 @@ const Notifications = ({ isOpen, onClose }) => {
   const markAllAsRead = async () => {
     try {
       await axios.patch('/api/notifications/read-all');
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: 1 })));
+      setNotifications(prev => Array.isArray(prev) ? prev.map(n => ({ ...n, isRead: 1 })) : []);
       setUnreadCount(0);
     } catch (error) {
       console.error('Error marking all as read:', error);

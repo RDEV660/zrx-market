@@ -149,7 +149,7 @@ const Dashboard = () => {
           <div className="dashboard-card top-items-card">
             <h2>Your Most Traded Items</h2>
             <div className="top-items-list">
-              {analytics.topItems.slice(0, 5).map((item, index) => (
+              {Array.isArray(analytics.topItems) && analytics.topItems.slice(0, 5).map((item, index) => (
                 <div key={index} className="top-item">
                   <span className="item-rank">#{index + 1}</span>
                   <span className="item-name">{item?.name || item}</span>

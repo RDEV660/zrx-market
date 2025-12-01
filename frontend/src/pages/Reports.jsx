@@ -120,8 +120,8 @@ const Reports = () => {
             >
               <option value="">-- Select a trade --</option>
               {trades.map((trade) => {
-                const offeredStr = trade.offered?.map(i => i.name).join(', ') || 'N/A';
-                const wantedStr = trade.wanted?.map(i => i.name).join(', ') || 'N/A';
+                const offeredStr = Array.isArray(trade.offered) ? trade.offered.map(i => i?.name || i).join(', ') : (trade.offered || 'N/A');
+                const wantedStr = Array.isArray(trade.wanted) ? trade.wanted.map(i => i?.name || i).join(', ') : (trade.wanted || 'N/A');
                 return (
                   <option key={trade.id} value={trade.id}>
                     Trade #{trade.id}: {offeredStr} for {wantedStr} {trade.value ? `(${trade.value})` : ''}

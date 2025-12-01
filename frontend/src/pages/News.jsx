@@ -232,7 +232,7 @@ const News = () => {
                 <span className="category-count">{categorizedUpdates['Steal a Brainrot'].length} updates</span>
               </div>
               <div className="updates-list">
-                {categorizedUpdates['Steal a Brainrot'].map((update, index) => renderUpdateCard(update, index))}
+                {Array.isArray(categorizedUpdates['Steal a Brainrot']) && categorizedUpdates['Steal a Brainrot'].map((update, index) => renderUpdateCard(update, index))}
               </div>
             </div>
           )}
@@ -248,7 +248,7 @@ const News = () => {
                 <span className="category-count">{categorizedUpdates['Grow a Garden'].length} updates</span>
               </div>
               <div className="updates-list">
-                {categorizedUpdates['Grow a Garden'].map((update, index) => renderUpdateCard(update, index))}
+                {Array.isArray(categorizedUpdates['Grow a Garden']) && categorizedUpdates['Grow a Garden'].map((update, index) => renderUpdateCard(update, index))}
               </div>
             </div>
           )}
@@ -264,7 +264,7 @@ const News = () => {
                 <span className="category-count">{categorizedUpdates['Other'].length} updates</span>
               </div>
               <div className="updates-list">
-                {categorizedUpdates['Other'].map((update, index) => renderUpdateCard(update, index))}
+                {Array.isArray(categorizedUpdates['Other']) && categorizedUpdates['Other'].map((update, index) => renderUpdateCard(update, index))}
               </div>
             </div>
           )}
@@ -275,7 +275,7 @@ const News = () => {
       {updates.length > 0 && activeCategory !== 'all' && (
         <div className="updates-list">
           {filteredUpdates.length > 0 ? (
-            filteredUpdates.map((update, index) => renderUpdateCard(update, index))
+            Array.isArray(filteredUpdates) && filteredUpdates.map((update, index) => renderUpdateCard(update, index))
           ) : (
             <div className="no-updates">
               <p>No updates found in this category.</p>
