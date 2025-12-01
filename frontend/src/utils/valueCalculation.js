@@ -389,3 +389,6 @@ export function getValueUnit(value) {
   
   return '/s';
 }
+
+// Explicit exports to ensure Vite recognizes them
+export { calculateItemValue, getValueUnit };
