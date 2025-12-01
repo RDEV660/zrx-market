@@ -354,23 +354,115 @@
   }
 }
 
+/* Mobile Menu Button */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  z-index: 1001;
+}
+
+.mobile-menu-btn:hover {
+  background: rgba(88, 101, 242, 0.2);
+}
+
+.mobile-menu-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-menu-overlay.active {
+  opacity: 1;
+}
+
+@media (max-width: 1024px) {
+  .global-chat {
+    width: 280px;
+  }
+  
+  .main-content {
+    margin-left: 280px;
+    padding-left: 2rem;
+  }
+}
+
 @media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: block;
+  }
+
   .nav-container {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: nowrap;
     padding: 0 1rem;
+    gap: 1rem;
+  }
+
+  .nav-logo {
+    font-size: 1.5rem;
+    flex: 1;
   }
 
   .nav-links {
-    width: 100%;
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 280px;
+    height: 100vh;
+    background: rgba(21, 21, 32, 0.98);
+    backdrop-filter: blur(20px);
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
     align-items: stretch;
+    padding: 80px 1.5rem 2rem;
+    z-index: 1000;
+    overflow-y: auto;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+    transition: left 0.3s ease;
+  }
+
+  .nav-links.mobile-open {
+    left: 0;
   }
 
   .nav-links a {
     width: 100%;
     text-align: left;
+    padding: 1rem;
+    border-radius: 10px;
+    font-size: 1rem;
+  }
+
+  .nav-auth {
+    gap: 0.5rem;
+  }
+
+  .user-menu {
+    flex-wrap: wrap;
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .login-btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
   }
 
   .layout-content-wrapper {
@@ -378,13 +470,52 @@
   }
 
   .main-content {
-    padding: 2rem 1rem;
+    padding: 1.5rem 1rem;
     margin-left: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .mobile-menu-overlay {
+    display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-container {
+    padding: 0 0.75rem;
+  }
+
+  .nav-logo {
+    font-size: 1.25rem;
   }
 
   .user-menu {
-    flex-wrap: wrap;
-    width: 100%;
-    justify-content: center;
+    gap: 0.25rem;
+  }
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .notifications-btn,
+  .profile-link {
+    padding: 0.4rem;
+    font-size: 1rem;
+  }
+
+  .logout-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .main-content {
+    padding: 1rem 0.75rem;
+  }
+
+  .footer {
+    padding: 1.5rem 1rem;
+    font-size: 0.9rem;
   }
 }

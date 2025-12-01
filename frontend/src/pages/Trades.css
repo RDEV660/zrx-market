@@ -439,10 +439,44 @@
 @media (max-width: 480px) {
   .items-grid {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
   
   .item-card {
     min-height: 100px;
+    padding: 8px;
+  }
+
+  .trades h1 {
+    font-size: 1.25rem;
+  }
+
+  .trade-card {
+    padding: 12px;
+  }
+
+  .trade-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .trade-footer button {
+    width: 100%;
+    padding: 10px;
+  }
+
+  .items-grid-container {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .add-item-card {
+    min-height: 80px;
+    padding: 16px;
+  }
+
+  .create-trade-form {
+    padding: 1rem;
   }
 }
 

@@ -13,6 +13,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -33,14 +34,44 @@ const Layout = ({ children }) => {
     }
   };
 
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
   return (
     <div className="layout">
       <nav className="navbar">
         <div className="nav-container">
-          <Link to="/" className="nav-logo">
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? '✕' : '☰'}
+          </button>
+          <Link to="/" className="nav-logo" onClick={closeMobileMenu}>
             ZRX MARKET
           </Link>
-          <div className="nav-links">
+          <div
+            className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}
+            onClick={(e) => {
+              // Close menu when clicking a link
+              if (e.target.tagName === 'A') {
+                closeMobileMenu();
+              }
+            }}
+          >
             <Link to="/trades" className={location.pathname === '/trades' ? 'active' : ''}>
               Trades
             </Link>
@@ -114,6 +145,12 @@ const Layout = ({ children }) => {
           </div>
         </div>
       </nav>
+      {mobileMenuOpen && (
+        <div
+          className={`mobile-menu-overlay ${mobileMenuOpen ? 'active' : ''}`}
+          onClick={closeMobileMenu}
+        />
+      )}
       <div className="layout-content-wrapper">
         <GlobalChat />
         <main className="main-content">{children}</main>
