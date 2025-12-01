@@ -4,63 +4,49 @@ const passport = require('../config/passport');
 const { authLimiter } = require('../middleware/rateLimit');
 
 // Discord OAuth2 login
-router.get('/discord', authLimiter, (req, res, next) => {
-  if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET) {
-    return res.status(500).json({ error: 'Discord OAuth is not configured. Please set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET in .env file.' });
-  }
-  passport.authenticate('discord')(req, res, next);
-});
+router.get('/discord', authLimiter, passport.authenticate('discord'));
 
 // Discord OAuth2 callback
 router.get(
   '/discord/callback',
   authLimiter,
   (req, res, next) => {
-    // Frontend URL - prefer FRONTEND_URL, then BASE_URL, then default
-    let frontendUrl = process.env.FRONTEND_URL;
-    if (!frontendUrl) {
-      frontendUrl = process.env.BASE_URL;
-    }
-    if (!frontendUrl && process.env.NODE_ENV === 'production') {
-      // In production, try to infer from request
-      frontendUrl = `${req.protocol}://${req.get('host')}`;
-    }
-    if (!frontendUrl) {
-      frontendUrl = 'http://localhost:5173';
-    }
+    // Log callback attempt for debugging
+    console.log('🔐 Discord OAuth callback received');
+    console.log('  - Query params:', req.query);
+    console.log('  - Session ID:', req.sessionID);
     
-    console.log('🔍 Frontend redirect URL:', frontendUrl);
-    console.log('🔍 FRONTEND_URL env:', process.env.FRONTEND_URL);
-    console.log('🔍 BASE_URL env:', process.env.BASE_URL);
-    
-    if (!process.env.DISCORD_CLIENT_ID || !process.env.DISCORD_CLIENT_SECRET) {
-      return res.redirect(`${frontendUrl}/?error=oauth_not_configured`);
-    }
-    
-    passport.authenticate('discord', {
-      failureRedirect: `${frontendUrl}/?error=auth_failed`,
-      successRedirect: `${frontendUrl}/dashboard`
-    })(req, res, (err) => {
-      // Handle authentication errors
+    passport.authenticate('discord', (err, user, info) => {
       if (err) {
-        console.error('Discord OAuth callback error:', err);
-        if (err.code === 'invalid_client') {
-          return res.redirect(`${frontendUrl}/?error=invalid_credentials`);
-        }
-        return res.redirect(`${frontendUrl}/?error=auth_failed`);
+        console.error('❌ Discord OAuth error:', err);
+        return res.redirect('/?error=auth_failed&reason=' + encodeURIComponent(err.message));
       }
-      // Check for failure info from passport
-      if (req.authInfo && req.authInfo.message) {
-        console.log('Auth failure reason:', req.authInfo.message);
-        if (req.authInfo.message.includes('member of the Discord server')) {
-          return res.redirect(`${frontendUrl}/?error=not_in_guild`);
-        }
-        if (req.authInfo.message.includes('blacklisted')) {
-          return res.redirect(`${frontendUrl}/?error=blacklisted`);
-        }
+      
+      if (!user) {
+        console.error('❌ Discord OAuth failed - no user:', info);
+        return res.redirect('/?error=auth_failed&reason=' + encodeURIComponent(info?.message || 'Authentication failed'));
       }
-      next();
-    });
+      
+      // Log in the user
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error('❌ Login error:', loginErr);
+          return res.redirect('/?error=auth_failed&reason=session_failed');
+        }
+        
+        console.log('✅ User logged in successfully:', user.discordId);
+        console.log('  - Session ID:', req.sessionID);
+        console.log('  - Cookie will be set with secure:', process.env.NODE_ENV === 'production');
+        
+        // Save session before redirect
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error('❌ Session save error:', saveErr);
+          }
+          res.redirect('/dashboard');
+        });
+      });
+    })(req, res, next);
   }
 );
 
@@ -68,60 +54,88 @@ router.get(
 router.post('/logout', (req, res) => {
   req.logout((err) => {
     if (err) {
+      console.error('Logout error:', err);
       return res.status(500).json({ error: 'Logout failed' });
     }
-    res.json({ message: 'Logged out successfully' });
+    
+    // Clear session cookie explicitly
+    req.session.destroy((destroyErr) => {
+      if (destroyErr) {
+        console.error('Session destroy error:', destroyErr);
+      }
+      
+      // Clear cookie
+      res.clearCookie('zrxmarket.sid', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/'
+      });
+      
+      res.json({ message: 'Logged out successfully' });
+    });
   });
 });
 
 // Get current user
 router.get('/me', async (req, res) => {
-  if (req.isAuthenticated && req.isAuthenticated()) {
-    try {
-      // Check if user is blacklisted
-      const { dbHelpers } = require('../db/config');
-      const blacklisted = await dbHelpers.get(
-        'SELECT * FROM blacklist WHERE discordId = ?',
-        [req.user.discordId]
-      );
+  try {
+    // Check if session exists
+    if (!req.session) {
+      console.log('⚠️  No session found in /me');
+      return res.json({ user: null, inGuild: false, sessionError: true });
+    }
+    
+    // Check if user is authenticated
+    if (req.isAuthenticated && req.isAuthenticated()) {
+      try {
+        // Check if user is blacklisted
+        const { dbHelpers } = require('../db/config');
+        const blacklisted = await dbHelpers.get(
+          'SELECT * FROM blacklist WHERE discordId = ?',
+          [req.user.discordId]
+        );
 
-      if (blacklisted) {
-        req.logout(() => {});
-        return res.json({ user: null, inGuild: false, blacklisted: true });
-      }
-
-      const user = { ...req.user };
-      user.roles = user.roles ? JSON.parse(user.roles) : [];
-      
-      // Check if user is server owner
-      let isOwner = false;
-      const guildId = process.env.GUILD_ID;
-      if (guildId && process.env.DISCORD_BOT_TOKEN) {
-        try {
-          const axios = require('axios').default;
-          const guildResponse = await axios.get(
-            `https://discord.com/api/v10/guilds/${guildId}`,
-            {
-              headers: {
-                Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`
-              }
-            }
-          );
-          isOwner = guildResponse.data.owner_id === req.user.discordId;
-        } catch (error) {
-          // Silently fail
+        if (blacklisted) {
+          req.logout(() => {});
+          return res.json({ user: null, inGuild: false, blacklisted: true });
         }
+
+        const user = { ...req.user };
+        user.roles = user.roles ? JSON.parse(user.roles) : [];
+        res.json({ user, inGuild: true });
+      } catch (error) {
+        console.error('Error in /me:', error);
+        res.json({ user: null, inGuild: false });
       }
-      user.isOwner = isOwner;
-      
-      res.json({ user, inGuild: true });
-    } catch (error) {
-      console.error('Error in /me:', error);
+    } else {
+      // User not authenticated - clear any invalid session
+      if (req.sessionID) {
+        console.log('⚠️  User not authenticated, clearing session:', req.sessionID);
+        req.session.destroy(() => {});
+      }
       res.json({ user: null, inGuild: false });
     }
-  } else {
-    res.json({ user: null, inGuild: false });
+  } catch (error) {
+    console.error('Error in /me route:', error);
+    res.json({ user: null, inGuild: false, error: true });
   }
+});
+
+// Clear session endpoint (for debugging/fixing cookie issues)
+router.post('/clear-session', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session:', err);
+    }
+    res.clearCookie('zrxmarket.sid', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    });
+    res.json({ message: 'Session cleared' });
+  });
 });
 
 module.exports = router;

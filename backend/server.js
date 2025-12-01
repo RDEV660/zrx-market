@@ -57,16 +57,31 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // Session configuration
+const isProduction = process.env.NODE_ENV === 'production';
+const isHTTPS = process.env.BASE_URL?.startsWith('https://') || isProduction;
+
 const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-min-32-chars-please',
   resave: false,
   saveUninitialized: false,
+  name: 'zrxmarket.sid', // Custom session name to avoid conflicts
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    secure: isHTTPS, // Only send over HTTPS in production
+    httpOnly: true, // Prevent XSS attacks
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: isHTTPS ? 'none' : 'lax', // 'none' for cross-site (Discord OAuth), 'lax' for same-site
+    // Don't set domain - let browser handle it automatically for subdomain compatibility
+    path: '/' // Available on all paths
   }
 };
+
+// Log cookie settings for debugging
+console.log('🍪 Session cookie configuration:');
+console.log('  - Secure:', sessionConfig.cookie.secure);
+console.log('  - SameSite:', sessionConfig.cookie.sameSite);
+console.log('  - HTTPOnly:', sessionConfig.cookie.httpOnly);
+console.log('  - Production:', isProduction);
+console.log('  - HTTPS:', isHTTPS);
 
 // Only use SQLiteStore if data directory exists
 try {
