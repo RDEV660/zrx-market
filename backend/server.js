@@ -29,8 +29,17 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
+// CORS configuration - supports both www and non-www versions of zrxmarket.com
+const allowedOrigins = [
+  process.env.BASE_URL,
+  process.env.FRONTEND_URL,
+  'https://zrxmarket.com',
+  'https://www.zrxmarket.com',
+  'http://localhost:5173' // Development fallback
+].filter(Boolean); // Remove undefined values
+
 app.use(cors({
-  origin: process.env.BASE_URL || 'http://localhost:5173',
+  origin: allowedOrigins.length > 0 ? allowedOrigins : 'http://localhost:5173',
   credentials: true
 }));
 
