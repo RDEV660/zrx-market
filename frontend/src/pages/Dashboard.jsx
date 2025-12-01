@@ -20,17 +20,41 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [analyticsRes, tradesRes, favoritesRes] = await Promise.all([
+      // Use Promise.allSettled to handle partial failures gracefully
+      const [analyticsRes, tradesRes, favoritesRes] = await Promise.allSettled([
         axios.get('/api/analytics/user'),
         axios.get(`/api/trades?creatorId=${user.discordId}&limit=5`),
         axios.get('/api/wishlist')
       ]);
 
-      setAnalytics(analyticsRes.data);
-      setRecentTrades(tradesRes.data.trades || tradesRes.data.slice(0, 5) || []);
-      setFavorites(favoritesRes.data.slice(0, 5));
+      // Handle analytics
+      if (analyticsRes.status === 'fulfilled') {
+        setAnalytics(analyticsRes.value.data);
+      } else {
+        console.warn('Failed to load analytics:', analyticsRes.reason);
+      }
+
+      // Handle trades
+      if (tradesRes.status === 'fulfilled') {
+        setRecentTrades(tradesRes.value.data.trades || tradesRes.value.data.slice(0, 5) || []);
+      } else {
+        console.warn('Failed to load trades:', tradesRes.reason);
+        setRecentTrades([]); // Set empty array on error
+      }
+
+      // Handle favorites
+      if (favoritesRes.status === 'fulfilled') {
+        setFavorites(favoritesRes.value.data.slice(0, 5));
+      } else {
+        console.warn('Failed to load favorites:', favoritesRes.reason);
+        setFavorites([]); // Set empty array on error
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      // Set defaults on complete failure
+      setAnalytics(null);
+      setRecentTrades([]);
+      setFavorites([]);
     } finally {
       setLoading(false);
     }
