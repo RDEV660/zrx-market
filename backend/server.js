@@ -101,7 +101,7 @@ app.get('/', (req, res) => {
       auth: '/auth',
       api: '/api'
     },
-    frontend: 'http://localhost:5173'
+    frontend: process.env.FRONTEND_URL || process.env.BASE_URL || 'http://localhost:5173'
   });
 });
 
@@ -128,7 +128,7 @@ async function startServer() {
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Base URL: ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
-      console.log(`Frontend: http://localhost:5173`);
+      console.log(`Frontend: ${process.env.FRONTEND_URL || process.env.BASE_URL || 'http://localhost:5173'}`);
     });
 
     // Start Discord bot if token is provided
