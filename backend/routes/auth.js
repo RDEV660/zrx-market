@@ -43,7 +43,12 @@ router.get(
           if (saveErr) {
             console.error('❌ Session save error:', saveErr);
           }
-          res.redirect('/dashboard');
+          
+          // Use absolute URL for redirect to ensure it works
+          const redirectUrl = process.env.FRONTEND_URL || process.env.BASE_URL || req.protocol + '://' + req.get('host');
+          const fullRedirectUrl = redirectUrl + '/dashboard';
+          console.log('  - Redirecting to:', fullRedirectUrl);
+          res.redirect(fullRedirectUrl);
         });
       });
     })(req, res, next);

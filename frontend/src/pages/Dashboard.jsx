@@ -14,6 +14,9 @@ const Dashboard = () => {
   useEffect(() => {
     if (user) {
       fetchDashboardData();
+    } else {
+      // If no user but we're on dashboard, check auth again
+      setLoading(false);
     }
   }, [user]);
 
