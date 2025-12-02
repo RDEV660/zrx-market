@@ -93,6 +93,7 @@ function runMigrations() {
     };
 
     // Check and add isCrossTrade to trades
+    scheduleTask();
     db.all(`PRAGMA table_info(trades)`, [], (err, columns) => {
       if (!err && columns) {
         const hasColumn = columns.some(col => col.name === 'isCrossTrade');
@@ -107,15 +108,17 @@ function runMigrations() {
               finishTask(false);
             }
           });
+          finishTask(true);
         } else {
-          done();
+          finishTask(true);
         }
       } else {
-        done();
+        finishTask(false);
       }
     });
 
     // Check and add isRead to messages
+    scheduleTask();
     db.all(`PRAGMA table_info(messages)`, [], (err, columns) => {
       if (!err && columns) {
         const hasColumn = columns.some(col => col.name === 'isRead');
@@ -130,11 +133,12 @@ function runMigrations() {
               finishTask(false);
             }
           });
+          finishTask(true);
         } else {
-          done();
+          finishTask(true);
         }
       } else {
-        done();
+        finishTask(false);
       }
     });
 
