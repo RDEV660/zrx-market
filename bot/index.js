@@ -1,6 +1,6 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
-const { Client, GatewayIntentBits, EmbedBuilder, Events, ActionRowBuilder, ButtonBuilder, ButtonStyle, InteractionType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, Events, ActionRowBuilder, ButtonBuilder, ButtonStyle, InteractionType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits, ActivityType } = require('discord.js');
 const sqlite3 = require('sqlite3').verbose();
 const EventEmitter = require('events');
 
@@ -136,6 +136,13 @@ class MiddlemanBot extends EventEmitter {
   setupEventHandlers() {
     this.client.once(Events.ClientReady, async () => {
       console.log(`🤖 Bot logged in as ${this.client.user.tag} - Ready to be a snarky asshole!`);
+      
+      // Set Rich Presence
+      this.client.user.setPresence({
+        activities: [{ name: 'zrxmarket.com', type: ActivityType.Watching }],
+        status: 'online',
+      });
+
       await this.registerSlashCommands();
       await this.setupPendingThreadTimers();
     });
