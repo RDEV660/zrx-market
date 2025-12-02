@@ -54,7 +54,7 @@ class AIManager {
         apiKey: apiKey,
         cache: true,
         temperature: 0.8,
-        model: 'llama3-8b-8192',
+        model: 'llama-3.1-8b-instant',
         maxTokens: 256,
         onFailedAttempt: (error) => {
           console.error('Groq API error:', error);
@@ -82,7 +82,7 @@ class AIManager {
             content: 'test',
           },
         ],
-        model: 'mixtral-8x7b-32768',
+        model: 'llama-3.1-8b-instant',
         temperature: 0.1,
         max_tokens: 10,
       });

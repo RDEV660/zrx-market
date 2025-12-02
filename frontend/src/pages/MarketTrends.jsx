@@ -14,9 +14,10 @@ const MarketTrends = () => {
     setLoading(true);
     try {
       const response = await axios.get('/api/analytics/market');
-      setMarketData(response.data);
+      setMarketData(response.data || {});
     } catch (error) {
       console.error('Error fetching market data:', error);
+      setMarketData({});
     } finally {
       setLoading(false);
     }
@@ -45,7 +46,7 @@ const MarketTrends = () => {
 
       <div className="trends-section">
         <h2>Most Popular Items</h2>
-        {marketData?.popularItems && marketData.popularItems.length > 0 ? (
+        {Array.isArray(marketData?.popularItems) && marketData.popularItems.length > 0 ? (
           <div className="popular-items-list">
             {marketData.popularItems.map((item, index) => (
               <div key={index} className="popular-item">
@@ -62,7 +63,7 @@ const MarketTrends = () => {
 
       <div className="trends-section">
         <h2>Trades by Category</h2>
-        {marketData?.tradesByCategory && marketData.tradesByCategory.length > 0 ? (
+        {Array.isArray(marketData?.tradesByCategory) && marketData.tradesByCategory.length > 0 ? (
           <div className="category-stats">
             {marketData.tradesByCategory.map((cat, index) => (
               <div key={index} className="category-stat">
@@ -85,14 +86,14 @@ const MarketTrends = () => {
       <div className="trends-section">
         <h2>Price Trends (Last 7 Days)</h2>
         <p className="section-description">Average trading prices for popular items based on completed trades</p>
-        {marketData?.priceTrends && marketData.priceTrends.length > 0 ? (
+        {Array.isArray(marketData?.priceTrends) && marketData.priceTrends.length > 0 ? (
           <div className="price-trends-list">
             {marketData.priceTrends.map((trend, index) => (
               <div key={index} className="price-trend-card">
                 <div className="price-trend-header">
                   <h3>{trend.name}</h3>
                   <span className={`trend-badge trend-${trend.trend}`}>
-                    {trend.trend === 'up' ? '=ƒôê' : trend.trend === 'down' ? '=ƒôë' : 'GPín+Å'} {trend.trend}
+                    {trend.trend === 'up' ? '=ï¿½ï¿½ï¿½' : trend.trend === 'down' ? '=ï¿½ï¿½ï¿½' : 'GPï¿½n+ï¿½'} {trend.trend}
                   </span>
                 </div>
                 <div className="price-trend-stats">
