@@ -29,9 +29,10 @@ const Templates = () => {
     setLoading(true);
     try {
       const response = await axios.get('/api/templates');
-      setTemplates(response.data);
+      setTemplates(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching templates:', error);
+      setTemplates([]);
     } finally {
       setLoading(false);
     }

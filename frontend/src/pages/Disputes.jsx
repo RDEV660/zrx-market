@@ -32,9 +32,10 @@ const Disputes = () => {
         ? `/api/disputes?status=${statusFilter}`
         : '/api/disputes/my-disputes';
       const response = await axios.get(endpoint);
-      setDisputes(response.data);
+      setDisputes(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching disputes:', error);
+      setDisputes([]);
     } finally {
       setLoading(false);
     }
@@ -250,6 +251,8 @@ const Disputes = () => {
 };
 
 export default Disputes;
+
+
 
 
 
