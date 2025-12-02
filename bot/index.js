@@ -129,6 +129,10 @@ class MiddlemanBot extends EventEmitter {
     const CasinoManager = require('./casino/CasinoManager');
     this.casino = new CasinoManager(db);
 
+    // Initialize AI Manager
+    const AIManager = require('./ai/AIManager');
+    this.ai = new AIManager(dbHelpers);
+
     this.setupEventHandlers();
     this.setupCommands();
   }
@@ -173,6 +177,15 @@ class MiddlemanBot extends EventEmitter {
 
     this.on('newReport', async (report) => {
       await this.notifyModerationChannel(report);
+    });
+
+    this.client.on(Events.MessageCreate, async (message) => {
+      // Handle AI chat in configured channels
+      if (message.guild && !message.author.bot && !message.system) {
+        await this.ai.handleMessage(message).catch(err => {
+          console.error('AI message handler error:', err);
+        });
+      }
     });
 
     this.client.on(Events.MessageReactionAdd, async (reaction, user) => {
@@ -341,6 +354,19 @@ class MiddlemanBot extends EventEmitter {
         new SlashCommandBuilder()
           .setName('stand')
           .setDescription('End your turn in blackjack'),
+
+        // AI commands
+        new SlashCommandBuilder()
+          .setName('ai')
+          .setDescription('AI chat configuration')
+          .addSubcommand(subcommand =>
+            subcommand
+              .setName('setup')
+              .setDescription('Set up AI chat channel')
+              .addChannelOption(option =>
+                option.setName('channel')
+                  .setDescription('Channel for AI chat')
+                  .setRequired(true))),
 
         // Moderator commands
         new SlashCommandBuilder()
@@ -531,7 +557,7 @@ class MiddlemanBot extends EventEmitter {
 
     // Commands that need async work - defer immediately to prevent timeout
     const asyncCommands = ['balance', 'daily', 'work', 'collect', 'slut', 'casinostats', 'coinflip', 'dice', 'double', 'roulette', 'blackjack', 'hit', 'stand', 
-                           'stats', 'user', 'trade', 'mm', 'blacklist', 'report', 'verify', 'unverify', 'serverstats', 'cleanup', 
+                           'stats', 'user', 'trade', 'ai', 'mm', 'blacklist', 'report', 'verify', 'unverify', 'serverstats', 'cleanup', 
                            'casinoadd', 'casinoremove', 'casinoreset'];
     const needsDefer = asyncCommands.includes(command);
     
@@ -622,6 +648,9 @@ class MiddlemanBot extends EventEmitter {
           break;
         case 'stand':
           await this.handleSlashBlackjackStand(interaction);
+          break;
+        case 'ai':
+          await this.handleSlashAI(interaction);
           break;
         case 'mm':
           await this.handleSlashMM(interaction);
@@ -3810,6 +3839,44 @@ class MiddlemanBot extends EventEmitter {
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       await interaction.editReply({ content: `❌ ${getSnarkyResponse('error')} ${error.message}` });
+    }
+  }
+
+  async handleSlashAI(interaction) {
+    const subcommand = interaction.options.getSubcommand();
+    
+    if (subcommand === 'setup') {
+      const hasModeratorRole = interaction.member?.roles.cache.has(process.env.MODERATOR_ROLE_ID);
+      if (!hasModeratorRole) {
+        return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')}` });
+      }
+
+      const channel = interaction.options.getChannel('channel');
+      if (!channel) {
+        return await interaction.editReply({ content: `❌ Invalid channel.` });
+      }
+
+      try {
+        await this.ai.setAIChannel(interaction.guild.id, channel.id);
+        
+        // Set rate limit on channel
+        try {
+          await channel.setRateLimitPerUser(10);
+        } catch (e) {
+          console.warn('Could not set rate limit on channel:', e);
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('✅ AI Channel Configured')
+          .setColor(0x5865F2)
+          .setDescription(`AI chat has been set up in <#${channel.id}>.\n\nUsers can now chat with the AI in this channel!`)
+          .setFooter({ text: `Configured by: ${interaction.user.tag}` })
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        await interaction.editReply({ content: `❌ ${getSnarkyResponse('error')} ${error.message}` });
+      }
     }
   }
 

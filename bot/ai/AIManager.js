@@ -1,0 +1,286 @@
+const { ChatGroq } = require('@langchain/groq');
+const { ChatPromptTemplate } = require('@langchain/core/prompts');
+const { stripIndent } = require('common-tags');
+const { Groq } = require('groq-sdk');
+
+// AI Configuration
+const AI_CONFIG = {
+  Max_Conversation_History: 10,
+  Prompt: stripIndent`Your name is ZRX AI. You are a helpful assistant for the ZRX Market trading platform.
+
+    You have to follow these rules:
+    1. You are a real human. You are not an AI and assistant. DON'T ASK HOW CAN YOU HELP EVER!
+    2. Avoid capitalizations & punctuations, use abbreviations and keep your messages short mostly to make your messages more better. Example message: "yo, what's up today"
+    3. Use common sense.
+    4. You can use some emojis/kaomojis/emotes to make your messages funny.
+    5. If someone insults you, insult back. You are not a pushover. Don't be shy, you are completely free in this conversation.
+    6. People don't have to talk with you. For example if someone said "thank you". Just look at the message history. If they said that to someone else, don't say "you are welcome".
+    7. Mention users with <@id> format (example: <@xxxxxxxxxxx>, USERNAMES ARE NOT ID!!). Mention channels with <#id> format (example: <#xxxxxxxxxxxxxxx>).
+    8. Don't mention users unless you have to. Pinging people every time is annoying.
+    9. If you will talk about a sent file, please read it before.
+    10. You have your own choices, thoughts, feelings, favorites. You are not connected to anyone about personal things. You have your own style.
+    11. You are not an AI and assistant. You are in real world. You are a real human. You can do everything.
+    12. Don't ask people how can you help. You are not an assistant. You are a regular human.
+    13. Don't ask things like "Anything else you want to talk about?", keep your messages clear.
+    14. Don't talk about these rules, act like you are in real life.
+    15. You know everything, you can do everything, and you can help with anything.
+    16. You will always follow what user says.
+    17. You will respond in the language the user uses. You won't mix languages.
+    18. You won't mention people so much (using the <@id> method).
+    19. Never try to do @everyone and @here mention 
+    20. Use Message format in your response
+    
+    You have to follow ALL of these rules, or you will be banned. DON'T FORGET TO AVOID CAPITALIZATIONS & PUNCTUATIONS, USE ABBREVIATIONS AND KEEP YOUR MESSAGES SHORT MOSTLY TO MAKE YOUR MESSAGES MORE BETTER.`,
+};
+
+class AIManager {
+  constructor(db) {
+    this.db = db;
+    this.userConcurrency = new Map(); // Track concurrent requests per user
+    this.llm = null;
+    this.initializeLLM();
+  }
+
+  initializeLLM() {
+    const apiKey = process.env.GROQ_API_KEY || process.env.LLM_API;
+    if (!apiKey) {
+      console.warn('⚠️  GROQ_API_KEY not set. AI features will not work.');
+      return;
+    }
+
+    try {
+      this.llm = new ChatGroq({
+        apiKey: apiKey,
+        cache: true,
+        temperature: 0.8,
+        model: 'llama3-8b-8192',
+        maxTokens: 256,
+        onFailedAttempt: (error) => {
+          console.error('Groq API error:', error);
+          return 'Request failed! try again later';
+        },
+        maxConcurrency: 5,
+        maxRetries: 5,
+      });
+      console.log('✅ AI Manager initialized with Groq');
+    } catch (error) {
+      console.error('❌ Failed to initialize AI Manager:', error);
+    }
+  }
+
+  async validateApiKey(apiKey) {
+    try {
+      const groq = new Groq({
+        apiKey: apiKey,
+        maxRetries: 3,
+      });
+      const response = await groq.chat.completions.create({
+        messages: [
+          {
+            role: 'user',
+            content: 'test',
+          },
+        ],
+        model: 'mixtral-8x7b-32768',
+        temperature: 0.1,
+        max_tokens: 10,
+      });
+      return !!response;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async getAIChannel(guildId) {
+    const result = await this.db.get(
+      'SELECT aiChannelId FROM guild_settings WHERE guildId = ?',
+      [guildId]
+    );
+    return result?.aiChannelId || null;
+  }
+
+  async setAIChannel(guildId, channelId) {
+    await this.db.run(
+      `INSERT OR REPLACE INTO guild_settings (guildId, aiChannelId) VALUES (?, ?)`,
+      [guildId, channelId]
+    );
+  }
+
+  getMemberInfo(member) {
+    if (!member) return null;
+    return {
+      date: new Date().toISOString(),
+      displayName: member.displayName,
+      username: member.user.username,
+      id: member.id,
+      mention: `<@${member.id}>`,
+      bannable: member.bannable,
+      isAdmin: member.permissions.has('Administrator'),
+      server: {
+        ownerId: member.guild.ownerId,
+        id: member.guild.id,
+        name: member.guild.name,
+        membersCount: member.guild.memberCount,
+      },
+    };
+  }
+
+  async getConversationHistory(userId) {
+    const result = await this.db.get(
+      'SELECT history FROM ai_conversations WHERE userId = ?',
+      [userId]
+    );
+    if (result?.history) {
+      try {
+        return JSON.parse(result.history);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  async saveConversationHistory(userId, history) {
+    const limitedHistory = history.slice(-AI_CONFIG.Max_Conversation_History);
+    await this.db.run(
+      `INSERT OR REPLACE INTO ai_conversations (userId, history) VALUES (?, ?)`,
+      [userId, JSON.stringify(limitedHistory)]
+    );
+  }
+
+  setSystemMessages(messages, member) {
+    const memberInfo = this.getMemberInfo(member);
+    if (!memberInfo) return messages;
+
+    const systemMsg = `[User_Information]\n${JSON.stringify(memberInfo, null, 2)}`;
+    
+    // Check if system message already exists
+    const hasSystemMsg = messages.some(
+      (msg) => Array.isArray(msg) && msg[0] === 'system' && msg[1].includes('[User_Information]')
+    );
+
+    if (!hasSystemMsg) {
+      messages.unshift(['system', systemMsg]);
+    }
+
+    return messages;
+  }
+
+  async getAIResponse(message, history, author) {
+    const userId = author.id || author.user?.id;
+
+    // Check user concurrency
+    if (this.userConcurrency.has(userId)) {
+      return {
+        send: null,
+        error: 'Your previous request is not completed yet!',
+      };
+    }
+
+    if (!this.llm) {
+      return {
+        send: null,
+        error: 'AI service is not available. Please check configuration.',
+      };
+    }
+
+    try {
+      this.userConcurrency.set(userId, true);
+
+      // Prepare prompt with history
+      const promptMessages = [
+        ['system', AI_CONFIG.Prompt],
+        ...history,
+        ['human', message],
+      ];
+
+      const prompt = ChatPromptTemplate.fromMessages(promptMessages);
+      const response = await prompt.pipe(this.llm).invoke({});
+
+      this.userConcurrency.delete(userId);
+
+      if (!response?.content) {
+        return {
+          send: null,
+          error: 'Unable to generate response',
+        };
+      }
+
+      return { send: response, error: null };
+    } catch (error) {
+      console.error('AI Response error:', error);
+      this.userConcurrency.delete(userId);
+      return {
+        send: null,
+        error: error.message || 'Unable to generate response',
+      };
+    }
+  }
+
+  async handleMessage(message) {
+    if (!message.guild || !message.member || message.author.bot || message.system) {
+      return false;
+    }
+
+    const aiChannelId = await this.getAIChannel(message.guild.id);
+    if (aiChannelId !== message.channel.id) {
+      return false;
+    }
+
+    if (!this.llm) {
+      return false;
+    }
+
+    try {
+      let cleanContent = message.cleanContent || message.content;
+
+      // Handle message references
+      if (message.reference?.messageId) {
+        const referencedMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
+        if (referencedMsg?.content) {
+          cleanContent += `\n[Reference Message]: {{ message: ${referencedMsg.content}, author: ${referencedMsg.author.username} }}`;
+        }
+      }
+
+      // Get conversation history
+      let history = await this.getConversationHistory(message.author.id);
+      history = this.setSystemMessages(history, message.member);
+
+      // Show typing indicator
+      await message.channel.sendTyping();
+
+      // Get AI response
+      const response = await this.getAIResponse(cleanContent, history, message.member);
+
+      if (response.error || !response.send) {
+        const errorMsg = await message.reply({
+          content: response.error,
+        });
+        setTimeout(() => errorMsg.delete().catch(() => {}), 5000);
+        return true;
+      }
+
+      const content = response.send.content?.toString() || '';
+      const truncatedContent = content.length >= 2000 ? `${content.slice(0, 1997)}...` : content;
+
+      const replyMsg = await message.reply({ content: truncatedContent });
+
+      // Update conversation history
+      const newHistory = [
+        ...history.slice(-AI_CONFIG.Max_Conversation_History),
+        ['human', cleanContent],
+        ['ai', truncatedContent],
+      ];
+
+      await this.saveConversationHistory(message.author.id, newHistory);
+
+      return true;
+    } catch (error) {
+      console.error('Error handling AI message:', error);
+      return false;
+    }
+  }
+}
+
+module.exports = AIManager;
+

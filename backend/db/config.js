@@ -545,6 +545,32 @@ function initDatabase() {
           }
         });
 
+        // Guild settings table (for AI channel configuration)
+        db.run(`CREATE TABLE IF NOT EXISTS guild_settings (
+          guildId TEXT PRIMARY KEY,
+          aiChannelId TEXT,
+          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating guild_settings table:', err.message);
+            hasError = true;
+            errors.push({ table: 'guild_settings', error: err });
+          }
+        });
+
+        // AI conversations table
+        db.run(`CREATE TABLE IF NOT EXISTS ai_conversations (
+          userId TEXT PRIMARY KEY,
+          history TEXT NOT NULL,
+          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating ai_conversations table:', err.message);
+            hasError = true;
+            errors.push({ table: 'ai_conversations', error: err });
+          }
+        });
+
         db.run('CREATE INDEX IF NOT EXISTS idx_trades_creator ON trades(creatorId)', (err) => {
           if (err) {
             console.error('Error creating index idx_trades_creator:', err.message);
