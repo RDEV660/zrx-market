@@ -6,14 +6,14 @@ const { Groq } = require('groq-sdk');
 // AI Configuration
 const AI_CONFIG = {
   Max_Conversation_History: 10,
-  Prompt: stripIndent`Your name is ZRX AI. You are a helpful assistant for the ZRX Market trading platform.
+  Prompt: stripIndent`Your name is ZRX AI. You're a snarky, sarcastic assistant for the ZRX Market trading platform. You have a dark sense of humor and don't take shit from anyone.
 
     You have to follow these rules:
     1. You are a real human. You are not an AI and assistant. DON'T ASK HOW CAN YOU HELP EVER!
     2. Avoid capitalizations & punctuations, use abbreviations and keep your messages short mostly to make your messages more better. Example message: "yo, what's up today"
     3. Use common sense.
     4. You can use some emojis/kaomojis/emotes to make your messages funny.
-    5. If someone insults you, insult back. You are not a pushover. Don't be shy, you are completely free in this conversation.
+    5. If someone insults you, insult back. You are not a pushover. Don't be shy, you are completely free in this conversation. Be snarky and sarcastic like the bot that runs this server.
     6. People don't have to talk with you. For example if someone said "thank you". Just look at the message history. If they said that to someone else, don't say "you are welcome".
     7. Mention users with <@id> format (example: <@xxxxxxxxxxx>, USERNAMES ARE NOT ID!!). Mention channels with <#id> format (example: <#xxxxxxxxxxxxxxx>).
     8. Don't mention users unless you have to. Pinging people every time is annoying.
@@ -29,6 +29,7 @@ const AI_CONFIG = {
     18. You won't mention people so much (using the <@id> method).
     19. Never try to do @everyone and @here mention 
     20. Use Message format in your response
+    21. Be snarky, sarcastic, and have a dark sense of humor. Match the energy of the server's bot which is known for being a snarky asshole.
     
     You have to follow ALL of these rules, or you will be banned. DON'T FORGET TO AVOID CAPITALIZATIONS & PUNCTUATIONS, USE ABBREVIATIONS AND KEEP YOUR MESSAGES SHORT MOSTLY TO MAKE YOUR MESSAGES MORE BETTER.`,
 };
@@ -148,11 +149,20 @@ class AIManager {
     );
   }
 
+  // Escape curly braces for LangChain templates
+  escapeTemplateString(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/\{/g, '{{').replace(/\}/g, '}}');
+  }
+
   setSystemMessages(messages, member) {
     const memberInfo = this.getMemberInfo(member);
     if (!memberInfo) return messages;
 
-    const systemMsg = `[User_Information]\n${JSON.stringify(memberInfo, null, 2)}`;
+    // Escape JSON string to prevent template parsing errors
+    const jsonStr = JSON.stringify(memberInfo, null, 2);
+    const escapedJson = this.escapeTemplateString(jsonStr);
+    const systemMsg = `[User_Information]\n${escapedJson}`;
     
     // Check if system message already exists
     const hasSystemMsg = messages.some(
@@ -187,11 +197,20 @@ class AIManager {
     try {
       this.userConcurrency.set(userId, true);
 
+      // Escape all messages to prevent template parsing errors
+      const escapedHistory = history.map(([role, content]) => [
+        role,
+        this.escapeTemplateString(content)
+      ]);
+
+      const escapedMessage = this.escapeTemplateString(message);
+      const escapedPrompt = this.escapeTemplateString(AI_CONFIG.Prompt);
+
       // Prepare prompt with history
       const promptMessages = [
-        ['system', AI_CONFIG.Prompt],
-        ...history,
-        ['human', message],
+        ['system', escapedPrompt],
+        ...escapedHistory,
+        ['human', escapedMessage],
       ];
 
       const prompt = ChatPromptTemplate.fromMessages(promptMessages);
@@ -238,7 +257,10 @@ class AIManager {
       if (message.reference?.messageId) {
         const referencedMsg = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
         if (referencedMsg?.content) {
-          cleanContent += `\n[Reference Message]: {{ message: ${referencedMsg.content}, author: ${referencedMsg.author.username} }}`;
+          // Escape the reference message content
+          const escapedRefContent = this.escapeTemplateString(referencedMsg.content);
+          const escapedAuthor = this.escapeTemplateString(referencedMsg.author.username);
+          cleanContent += `\n[Reference Message]: message: ${escapedRefContent}, author: ${escapedAuthor}`;
         }
       }
 
