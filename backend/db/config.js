@@ -459,6 +459,67 @@ function initDatabase() {
           }
         });
 
+        // Trade Reviews table
+        db.run(`CREATE TABLE IF NOT EXISTS trade_reviews (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tradeId INTEGER,
+          reviewerId TEXT NOT NULL,
+          revieweeId TEXT NOT NULL,
+          rating INTEGER NOT NULL,
+          comment TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (tradeId) REFERENCES trades(id),
+          FOREIGN KEY (reviewerId) REFERENCES users(discordId),
+          FOREIGN KEY (revieweeId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating trade_reviews table:', err.message);
+            hasError = true;
+            errors.push({ table: 'trade_reviews', error: err });
+          }
+        });
+
+        // Trade Templates table
+        db.run(`CREATE TABLE IF NOT EXISTS trade_templates (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId TEXT NOT NULL,
+          name TEXT NOT NULL,
+          offered TEXT NOT NULL,
+          wanted TEXT NOT NULL,
+          value TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (userId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating trade_templates table:', err.message);
+            hasError = true;
+            errors.push({ table: 'trade_templates', error: err });
+          }
+        });
+
+        // Disputes table
+        db.run(`CREATE TABLE IF NOT EXISTS disputes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tradeId INTEGER NOT NULL,
+          reporterId TEXT NOT NULL,
+          accusedId TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          evidence TEXT,
+          status TEXT DEFAULT 'open',
+          resolution TEXT,
+          moderatorId TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (tradeId) REFERENCES trades(id),
+          FOREIGN KEY (reporterId) REFERENCES users(discordId),
+          FOREIGN KEY (accusedId) REFERENCES users(discordId)
+        )`, (err) => {
+          if (err) {
+            console.error('❌ Error creating disputes table:', err.message);
+            hasError = true;
+            errors.push({ table: 'disputes', error: err });
+          }
+        });
+
         // Bridge sessions table (for Discord bridge threads)
         db.run(`CREATE TABLE IF NOT EXISTS bridge_sessions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
