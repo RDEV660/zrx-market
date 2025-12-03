@@ -300,6 +300,8 @@ function initDatabase() {
           tradeId INTEGER,
           user1Accepted INTEGER DEFAULT 0,
           user2Accepted INTEGER DEFAULT 0,
+          user1RequestedMM INTEGER DEFAULT 0,
+          user2RequestedMM INTEGER DEFAULT 0,
           createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (requesterId) REFERENCES users(discordId),
           FOREIGN KEY (tradeId) REFERENCES trades(id)
@@ -317,7 +319,9 @@ function initDatabase() {
                   { name: 'threadId', sql: 'ALTER TABLE middleman ADD COLUMN threadId TEXT' },
                   { name: 'tradeId', sql: 'ALTER TABLE middleman ADD COLUMN tradeId INTEGER' },
                   { name: 'user1Accepted', sql: 'ALTER TABLE middleman ADD COLUMN user1Accepted INTEGER DEFAULT 0' },
-                  { name: 'user2Accepted', sql: 'ALTER TABLE middleman ADD COLUMN user2Accepted INTEGER DEFAULT 0' }
+                  { name: 'user2Accepted', sql: 'ALTER TABLE middleman ADD COLUMN user2Accepted INTEGER DEFAULT 0' },
+                  { name: 'user1RequestedMM', sql: 'ALTER TABLE middleman ADD COLUMN user1RequestedMM INTEGER DEFAULT 0' },
+                  { name: 'user2RequestedMM', sql: 'ALTER TABLE middleman ADD COLUMN user2RequestedMM INTEGER DEFAULT 0' }
                 ];
 
                 columnsToAdd.forEach(({ name, sql }) => {
