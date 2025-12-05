@@ -8,11 +8,12 @@ let DB_PATH = path.join(__dirname, '../../data/zrx-market.db');
 let DB_DIR = path.dirname(DB_PATH);
 
 // Try alternative paths if the default doesn't work
+// Priority: /data (Railway persistent volume) > project data > working directory
 const possiblePaths = [
+  '/data/zrx-market.db', // Railway persistent volume (PRIORITY)
   path.join(__dirname, '../../data/zrx-market.db'), // Default: project root/data
   path.join(process.cwd(), 'data/zrx-market.db'), // Working directory/data
   path.join(__dirname, '../data/zrx-market.db'), // backend/data
-  '/tmp/zrx-market.db' // Temp directory (usually writable on Railway)
 ];
 
 // Ensure data directory exists for the first path
@@ -49,7 +50,7 @@ const db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READWRITE | sqlite3.OPEN_C
     console.error('❌ Error code:', err.code, 'Error number:', err.errno);
   } else {
     console.log('✅ Connected to SQLite database');
-    // Test if database is writable
+    // Test if database is writable and set persistence settings
     db.run('PRAGMA journal_mode = WAL;', (pragmaErr) => {
       if (pragmaErr) {
         console.warn('⚠️  Warning: Could not set WAL mode, database may be read-only:', pragmaErr.message);
@@ -57,6 +58,32 @@ const db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READWRITE | sqlite3.OPEN_C
         console.log('✅ Database is writable (WAL mode enabled)');
       }
     });
+    
+    // Ensure data is synced to disk for persistence
+    db.run('PRAGMA synchronous = FULL;', (syncErr) => {
+      if (syncErr) {
+        console.warn('⚠️  Warning: Could not set synchronous mode:', syncErr.message);
+      } else {
+        console.log('✅ Database synchronous mode set to FULL (maximum durability)');
+      }
+    });
+    
+    // Set busy timeout to handle concurrent writes
+    db.run('PRAGMA busy_timeout = 5000;', (timeoutErr) => {
+      if (timeoutErr) {
+        console.warn('⚠️  Warning: Could not set busy timeout:', timeoutErr.message);
+      }
+    });
+    
+    // Periodic WAL checkpoint to ensure data is persisted
+    // Checkpoint every 30 seconds to ensure data is written to disk
+    setInterval(() => {
+      db.run('PRAGMA wal_checkpoint(TRUNCATE);', (checkpointErr) => {
+        if (checkpointErr) {
+          console.warn('⚠️  WAL checkpoint warning (non-critical):', checkpointErr.message);
+        }
+      });
+    }, 30000); // Every 30 seconds
   }
 });
 
@@ -739,8 +766,13 @@ const dbHelpers = {
   run: (query, params = []) => {
     return new Promise((resolve, reject) => {
       db.run(query, params, function(err) {
-        if (err) reject(err);
-        else resolve({ lastID: this.lastID, changes: this.changes });
+        if (err) {
+          reject(err);
+        } else {
+          // Resolve immediately - WAL mode handles persistence
+          // Periodic checkpointing is handled separately
+          resolve({ lastID: this.lastID, changes: this.changes });
+        }
       });
     });
   }
