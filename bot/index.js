@@ -185,6 +185,26 @@ class MiddlemanBot extends EventEmitter {
       console.log(`Request ${request.id} updated to status: ${request.status}`);
     });
 
+    this.on('newRequest', async (request) => {
+      console.log(`📨 New middleman request received: #${request.id}`);
+      try {
+        // Check if this is a request from chat (has tradeId and both parties requested)
+        if (request.tradeId && request.user1RequestedMM && request.user2RequestedMM) {
+          // Create acceptance thread for trade-based requests
+          await this.createAcceptanceThread(request);
+        } else {
+          // Post directly for traditional requests
+          await this.postMiddlemanRequest(request);
+        }
+      } catch (error) {
+        console.error('❌ Error handling newRequest event:', error);
+        console.error('Error details:', error.message);
+        if (error.stack) {
+          console.error('Stack trace:', error.stack);
+        }
+      }
+    });
+
     this.on('newReport', async (report) => {
       await this.notifyModerationChannel(report);
     });
