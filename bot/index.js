@@ -819,11 +819,12 @@ class MiddlemanBot extends EventEmitter {
       );
 
       if (updatedRequest && updatedRequest.user1Accepted === 1 && updatedRequest.user2Accepted === 1) {
-        const roleMention = process.env.MIDDLEMAN_ROLE_ID ? `<@&${process.env.MIDDLEMAN_ROLE_ID}>` : '';
+        const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
+        const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
         await thread.send({
-          content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention} A middleman is needed for this trade.\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>`
+          content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention}\n\n**Trade Ready for Middleman!**\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>\n\n*ZRX MARKET - Secure Trading Platform*`
         });
-        console.log(`✅ Both parties accepted trade #${requestId}, middleman pinged`);
+        console.log(`✅ Both parties accepted trade #${requestId}, trusted middleman pinged`);
 
       } else {
         const createdAt = new Date(request.createdAt);
@@ -1610,11 +1611,12 @@ class MiddlemanBot extends EventEmitter {
         );
 
         if (reason === 'both_accepted' || (finalRequest && finalRequest.user1Accepted === 1 && finalRequest.user2Accepted === 1)) {
-          const roleMention = process.env.MIDDLEMAN_ROLE_ID ? `<@&${process.env.MIDDLEMAN_ROLE_ID}>` : '';
+          const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
+          const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
           await thread.send({
-            content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention} A middleman is needed for this trade.\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>`
+            content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention}\n\n**Trade Ready for Middleman!**\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>\n\n*ZRX MARKET - Secure Trading Platform*`
           });
-          console.log(`✅ Both parties accepted trade #${requestId}, middleman pinged`);
+          console.log(`✅ Both parties accepted trade #${requestId}, trusted middleman pinged`);
         } else {
           try {
             await thread.send('⏰ **Time expired or not all parties accepted.**\n\nThis thread will be deleted in 10 seconds.');
@@ -1656,6 +1658,18 @@ class MiddlemanBot extends EventEmitter {
         return;
       }
 
+      // Check if both parties already confirmed on the website
+      const bothConfirmedOnWebsite = request.user1RequestedMM && request.user2RequestedMM;
+      
+      // If both confirmed on website, mark them as accepted in DB and skip confirmation
+      if (bothConfirmedOnWebsite) {
+        await dbHelpers.run(
+          'UPDATE middleman SET user1Accepted = 1, user2Accepted = 1 WHERE id = ?',
+          [request.id]
+        );
+        console.log(`✅ Both parties already confirmed on website, skipping confirmation step`);
+      }
+
       const requester = await dbHelpers.get(
         'SELECT * FROM users WHERE discordId = ?',
         [request.requesterId]
@@ -1663,11 +1677,92 @@ class MiddlemanBot extends EventEmitter {
 
       const proofLinks = request.proofLinks ? JSON.parse(request.proofLinks) : [];
 
+      // Create thread with cooler messaging
+      const threadName = `MM-${request.id} | ${request.item?.substring(0, 50) || 'Trade'}`;
+      
+      // If both already confirmed, create thread directly without asking for confirmation
+      if (bothConfirmedOnWebsite) {
+        const initialMessage = await middlemanChannel.send({
+          content: `🔒 **Trade Agreement Confirmed** ✅\n\n<@${user1Id}> and <@${user2Id}> have both accepted this trade on the website.\n\n**Ready for middleman assistance!**`
+        });
+
+        const thread = await initialMessage.startThread({
+          name: threadName,
+          type: 12,
+          autoArchiveDuration: 60,
+          reason: `Middleman request #${request.id} - both parties confirmed`
+        });
+
+        console.log(`✅ Created thread (both confirmed): ${thread.name} (${thread.id})`);
+
+        await dbHelpers.run(
+          'UPDATE middleman SET threadId = ? WHERE id = ?',
+          [thread.id, request.id]
+        );
+
+        const usersToAdd = [request.requesterId, user1Id, user2Id];
+        const uniqueUsers = [...new Set(usersToAdd.filter(id => id && id.length > 0))];
+        
+        const axios = require('axios').default;
+        for (const userId of uniqueUsers) {
+          try {
+            await axios.put(
+              `https://discord.com/api/v10/channels/${thread.id}/thread-members/${userId}`,
+              {},
+              {
+                headers: {
+                  Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+          } catch (error) {
+            console.log(`⚠️ Could not add user ${userId} to thread (they can join manually)`);
+          }
+        }
+
+        // Create cooler embed
+        const tradeEmbed = new EmbedBuilder()
+          .setTitle(`🤝 Middleman Request #${request.id} - ZRX MARKET`)
+          .setColor(0x00FF00)
+          .setDescription('**✅ Trade Agreement Confirmed**\n\nBoth parties have accepted this trade and are ready for middleman assistance!')
+          .addFields(
+            { name: '👤 Requester', value: `<@${request.requesterId}>`, inline: true },
+            { name: '👥 User 1', value: `<@${user1Id}>`, inline: true },
+            { name: '👥 User 2', value: `<@${user2Id}>`, inline: true },
+            { name: '🛒 Trade Details', value: request.item || 'N/A', inline: false },
+            { name: '💰 Value', value: request.value || 'N/A', inline: true },
+            { name: '🎮 Roblox Username', value: request.robloxUsername || 'N/A', inline: true }
+          )
+          .setFooter({ text: `ZRX MARKET | Request ID: ${request.id}` })
+          .setTimestamp();
+
+        if (proofLinks.length > 0) {
+          tradeEmbed.addFields({ 
+            name: '📎 Proof Links', 
+            value: proofLinks.map(link => `[Link](${link})`).join('\n'), 
+            inline: false 
+          });
+        }
+
+        // Ping trusted middleman role
+        const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
+        const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
+        
+        await thread.send({
+          content: `${roleMention}\n\n🎉 **Trade Ready for Middleman!**\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>\n\n**Trade:** ${request.item}\n\n*A trusted middleman is needed to facilitate this trade.*`,
+          embeds: [tradeEmbed]
+        });
+
+        console.log(`✅ Both parties confirmed, middleman pinged for request #${request.id}`);
+        return;
+      }
+
+      // If not both confirmed, create thread with acceptance requirement
       const initialMessage = await middlemanChannel.send({
         content: `🔒 **Trade Agreement Required**\n\n<@${user1Id}> and <@${user2Id}> must both accept this trade within 5 minutes.\n\nIf both parties don't accept, this thread will be automatically deleted.`
       });
 
-      const threadName = `MM-${request.id} | ${request.item?.substring(0, 50) || 'Trade'}`;
       const thread = await initialMessage.startThread({
         name: threadName,
         type: 12,
@@ -1704,7 +1799,7 @@ class MiddlemanBot extends EventEmitter {
       }
 
       const tradeEmbed = new EmbedBuilder()
-        .setTitle(`📋 Trade Agreement - Request #${request.id}`)
+        .setTitle(`📋 Trade Agreement - Request #${request.id} | ZRX MARKET`)
         .setColor(0xFFA500)
         .setDescription('**Both parties must accept this trade by reacting with ✅**\n\nYou have 5 minutes to both accept, or this thread will be deleted.')
         .addFields(
@@ -1715,7 +1810,7 @@ class MiddlemanBot extends EventEmitter {
           { name: '💰 Value', value: request.value || 'N/A', inline: true },
           { name: '🎮 Roblox Username', value: request.robloxUsername || 'N/A', inline: true }
         )
-        .setFooter({ text: `Request ID: ${request.id} | React with ✅ to accept` })
+        .setFooter({ text: `ZRX MARKET | Request ID: ${request.id} | React with ✅ to accept` })
         .setTimestamp();
 
       if (proofLinks.length > 0) {
@@ -1781,11 +1876,12 @@ class MiddlemanBot extends EventEmitter {
         );
 
         if (reason === 'both_accepted' || (finalRequest && finalRequest.user1Accepted === 1 && finalRequest.user2Accepted === 1)) {
-          const roleMention = process.env.MIDDLEMAN_ROLE_ID ? `<@&${process.env.MIDDLEMAN_ROLE_ID}>` : '';
+          const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
+          const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
           await thread.send({
-            content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention} A middleman is needed for this trade.\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>`
+            content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention}\n\n**Trade Ready for Middleman!**\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>\n\n*ZRX MARKET - Secure Trading Platform*`
           });
-          console.log(`✅ Both parties accepted trade #${request.id}, middleman pinged`);
+          console.log(`✅ Both parties accepted trade #${request.id}, trusted middleman pinged`);
         } else {
           try {
             await thread.send('⏰ **Time expired or not all parties accepted.**\n\nThis thread will be deleted in 10 seconds.');
@@ -1838,26 +1934,28 @@ class MiddlemanBot extends EventEmitter {
       const proofLinks = request.proofLinks ? JSON.parse(request.proofLinks) : [];
 
       const embed = new EmbedBuilder()
-        .setTitle(`Middleman Request #${request.id}`)
-        .setColor(0x5865F2)
+        .setTitle(`🤝 Middleman Request #${request.id} - ZRX MARKET`)
+        .setColor(0x00FF00)
+        .setDescription('**A trusted middleman is needed to facilitate this trade!**')
         .addFields(
-          { name: 'Requester', value: requester?.username || 'Unknown', inline: true },
-          { name: 'User 1', value: request.user1, inline: true },
-          { name: 'User 2', value: request.user2, inline: true },
-          { name: 'Item/Details', value: request.item, inline: false },
-          { name: 'Value', value: request.value || 'N/A', inline: true },
-          { name: 'Roblox Username', value: request.robloxUsername || 'N/A', inline: true }
+          { name: '👤 Requester', value: requester?.username || 'Unknown', inline: true },
+          { name: '👥 User 1', value: request.user1, inline: true },
+          { name: '👥 User 2', value: request.user2, inline: true },
+          { name: '🛒 Trade Details', value: request.item || 'N/A', inline: false },
+          { name: '💰 Value', value: request.value || 'N/A', inline: true },
+          { name: '🎮 Roblox Username', value: request.robloxUsername || 'N/A', inline: true }
         )
-        .setFooter({ text: `Request ID: ${request.id}` })
+        .setFooter({ text: `ZRX MARKET | Request ID: ${request.id}` })
         .setTimestamp(new Date(request.createdAt));
 
       if (proofLinks.length > 0) {
         embed.addFields({ name: 'Proof Links', value: proofLinks.join('\n'), inline: false });
       }
 
-      const roleMention = `<@&${process.env.MIDDLEMAN_ROLE_ID}>`;
+      const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
+      const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
       const message = await channel.send({
-        content: `${roleMention} New middleman request!`,
+        content: `${roleMention}\n\n**🤝 New Middleman Request - ZRX MARKET**\n\nA trusted middleman is needed for this trade!`,
         embeds: [embed]
       });
 
